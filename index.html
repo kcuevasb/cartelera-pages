@@ -355,7 +355,23 @@
   .explore-view.show{display:block;}
   .explore-type-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:18px;}
   .explore-section{margin-bottom:26px;}
-  .explore-label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+  .explore-label{
+    display:flex;align-items:center;gap:8px;width:100%;
+    background:none;border:none;text-align:left;cursor:pointer;
+    font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;
+  }
+  .explore-label:hover{color:var(--text-dim);}
+  .explore-label-arrow{
+    font-size:10px;text-transform:none;letter-spacing:0;color:var(--text-faint);
+    opacity:0;transition:opacity .12s;
+  }
+  .explore-label:hover .explore-label-arrow{opacity:1;}
+
+  .explore-drill-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+  .explore-drill-head h3{font-family:var(--font-display);font-weight:500;font-size:17px;margin:0;color:var(--text);}
+  .explore-drill-grid{margin-top:0;}
+  .explore-drill-grid .explore-card{width:100%;}
+  .explore-drill-grid .explore-card img{width:100%;height:auto;}
   .explore-row{display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;}
   .explore-card{flex:0 0 130px;}
   .explore-card img{width:130px;height:195px;object-fit:cover;border-radius:3px;display:block;background:#0d0d0d;filter:saturate(.92);}
@@ -763,6 +779,7 @@ let librarySearch = '';
 let weekViewActive = false;
 let exploreViewActive = false;
 let exploreMediaType = 'movie';
+let exploreDrill = null; // { mediaType, section } cuando estás viendo una sola sección a pantalla completa
 let watchedViewActive = false;
 let watchedMediaType = 'movie';
 const exploreCache = {};
@@ -1365,13 +1382,13 @@ async function ensureExploreSection(mediaType, section){
   return cache;
 }
 
-async function loadMoreExploreRow(cacheKey){
+/** Trae una página más de TMDB para esta sección. Devuelve los items nuevos (o null si ya no hay más). */
+async function fetchNextExplorePage(cacheKey){
   const cache = exploreCache[cacheKey];
-  if(!cache) return;
+  if(!cache) return null;
   if(cache.page >= cache.totalPages){
     showToast('No hay más resultados en esta sección por ahora.');
-    renderExploreRow(cacheKey);
-    return;
+    return null;
   }
   try{
     const nextPage = cache.page + 1;
@@ -1379,25 +1396,86 @@ async function loadMoreExploreRow(cacheKey){
     cache.rawItems.push(...results);
     cache.page = nextPage;
     cache.totalPages = totalPages;
+    return results;
   }catch(err){
     showToast('No se pudo cargar más contenido ahora mismo.');
+    return [];
   }
-  renderExploreRow(cacheKey);
+}
+
+function buildExploreCardEl(it){
+  const year = it.date ? it.date.slice(0,4) : 's/f';
+  const div = document.createElement('div');
+  div.className = 'explore-card';
+  div.innerHTML = `
+    ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:100%;aspect-ratio:2/3;background:#0d0d0d;border-radius:3px;"></div>`}
+    <div class="ec-title">${escapeHtml(it.title||'')}</div>
+    <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
+    <div class="explore-actions">
+      <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="watchlist">Añadir</button>
+      <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>
+    </div>
+  `;
+  wireExploreCard(div);
+  return div;
+}
+
+/** Al añadir/marcar, quita solo esa tarjeta del DOM — nunca se re-pinta el contenedor entero,
+ * así que el scroll (horizontal en la fila, o de la página en la pantalla de sección) no salta. */
+function wireExploreCard(cardEl){
+  cardEl.querySelectorAll('[data-explore-id]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.exploreId;
+      const status = btn.dataset.exploreStatus || 'watchlist';
+      const container = cardEl.parentElement;
+      cardEl.querySelectorAll(`[data-explore-id="${id}"]`).forEach(b=>{ b.disabled = true; });
+      btn.textContent = status === 'completed' ? 'Marcando…' : 'Añadiendo…';
+      await addItem({ id: Number(id), media_type: btn.dataset.exploreType }, status);
+      cardEl.remove();
+      if(container) maybeShowExploreEmptyMessage(container);
+    });
+  });
+}
+
+function maybeShowExploreEmptyMessage(container){
+  const remaining = container.querySelectorAll('.explore-card:not(.explore-load-more)').length;
+  const hasLoadMore = !!container.querySelector('.explore-load-more');
+  if(remaining === 0 && !hasLoadMore){
+    container.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`;
+  }
 }
 
 async function renderExploreView(){
   const container = document.getElementById('exploreSections');
+  const typeTabs = document.getElementById('exploreTypeTabs');
   if(!STATE.apiKey){
+    typeTabs.classList.remove('hidden');
     container.innerHTML = `<p class="help-text">Configura tu clave de TMDB en Ajustes para poder explorar el catálogo.</p>`;
     return;
   }
+
+  if(exploreDrill){
+    typeTabs.classList.add('hidden');
+    await renderExploreDrillScreen();
+    return;
+  }
+  typeTabs.classList.remove('hidden');
+
   const sections = exploreMediaType === 'movie' ? MOVIE_EXPLORE_SECTIONS : TV_EXPLORE_SECTIONS;
   container.innerHTML = sections.map(s=>`
     <div class="explore-section">
-      <div class="explore-label">${s.label}</div>
+      <button class="explore-label" data-drill-key="${s.key}">${escapeHtml(s.label)} <span class="explore-label-arrow">Ver todo →</span></button>
       <div class="explore-row" id="explore-row-${s.key}"><p class="loader-line">Cargando…</p></div>
     </div>
   `).join('');
+
+  container.querySelectorAll('[data-drill-key]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const section = sections.find(s=>s.key===btn.dataset.drillKey);
+      enterExploreDrill(exploreMediaType, section);
+    });
+  });
+
   for(const s of sections){
     const cacheKey = `${exploreMediaType}:${s.key}`;
     try{
@@ -1424,43 +1502,90 @@ function renderExploreRow(cacheKey){
     return;
   }
 
-  row.innerHTML = visible.map(it=>{
-    const year = it.date ? it.date.slice(0,4) : 's/f';
-    return `
-      <div class="explore-card">
-        ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:130px;height:195px;background:#0d0d0d;border-radius:3px;"></div>`}
-        <div class="ec-title">${escapeHtml(it.title||'')}</div>
-        <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
-        <div class="explore-actions">
-          <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="watchlist">Añadir</button>
-          <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>
-        </div>
-      </div>
-    `;
-  }).join('') + (hasMore ? `
-    <div class="explore-card explore-load-more" data-load-more="${cacheKey}" tabindex="0" role="button" aria-label="Cargar más resultados">
-      <div class="explore-load-more-inner">Cargar más →</div>
-    </div>
-  ` : '');
+  row.innerHTML = '';
+  visible.forEach(it => row.appendChild(buildExploreCardEl(it)));
 
-  row.querySelectorAll('[data-explore-id]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const id = btn.dataset.exploreId;
-      const status = btn.dataset.exploreStatus || 'watchlist';
-      row.querySelectorAll(`[data-explore-id="${id}"]`).forEach(b=>{ b.disabled = true; });
-      btn.textContent = status === 'completed' ? 'Marcando…' : 'Añadiendo…';
-      await addItem({ id: Number(id), media_type: btn.dataset.exploreType }, status);
-      renderExploreRow(cacheKey);
-    });
-  });
-  const loadMoreEl = row.querySelector('[data-load-more]');
-  if(loadMoreEl){
+  if(hasMore){
+    const loadMoreEl = document.createElement('div');
+    loadMoreEl.className = 'explore-card explore-load-more';
+    loadMoreEl.tabIndex = 0;
+    loadMoreEl.setAttribute('role','button');
+    loadMoreEl.setAttribute('aria-label','Cargar más resultados');
+    loadMoreEl.innerHTML = `<div class="explore-load-more-inner">Cargar más →</div>`;
     const trigger = async ()=>{
       loadMoreEl.querySelector('.explore-load-more-inner').textContent = 'Cargando…';
-      await loadMoreExploreRow(cacheKey);
+      const newItems = await fetchNextExplorePage(cacheKey);
+      if(newItems === null){ loadMoreEl.remove(); return; }
+      const cache2 = exploreCache[cacheKey];
+      const visibleNew = newItems.filter(it => !STATE.library.some(li => li.tmdb_id===it.id && li.media_type===it.media_type));
+      visibleNew.forEach(it => row.insertBefore(buildExploreCardEl(it), loadMoreEl));
+      if(cache2.page >= cache2.totalPages){ loadMoreEl.remove(); }
+      else { loadMoreEl.querySelector('.explore-load-more-inner').textContent = 'Cargar más →'; }
     };
     loadMoreEl.addEventListener('click', trigger);
     loadMoreEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); trigger(); } });
+    row.appendChild(loadMoreEl);
+  }
+}
+
+/* ---- pantalla dedicada a una sola sección (al pinchar su título) ---- */
+function enterExploreDrill(mediaType, section){
+  exploreDrill = { mediaType, section };
+  renderExploreView();
+}
+function exitExploreDrill(){
+  exploreDrill = null;
+  renderExploreView();
+}
+
+async function renderExploreDrillScreen(){
+  const container = document.getElementById('exploreSections');
+  const { mediaType, section } = exploreDrill;
+  const cacheKey = `${mediaType}:${section.key}`;
+  container.innerHTML = `
+    <div class="explore-drill-head">
+      <button class="back-home-btn" id="exploreDrillBack">← Volver</button>
+      <h3>${escapeHtml(section.label)} · ${mediaType === 'movie' ? 'Películas' : 'Series'}</h3>
+    </div>
+    <div class="grid explore-drill-grid" id="exploreDrillGrid"><p class="loader-line">Cargando…</p></div>
+  `;
+  document.getElementById('exploreDrillBack').addEventListener('click', exitExploreDrill);
+  try{
+    await ensureExploreSection(mediaType, section);
+    renderExploreDrillGrid(cacheKey);
+  }catch(err){
+    console.error('Error cargando sección de Explorar', section.key, err);
+    document.getElementById('exploreDrillGrid').innerHTML = `<p class="help-text">No se pudo cargar esta sección. Revisa tu clave de API.</p>`;
+  }
+}
+
+function renderExploreDrillGrid(cacheKey){
+  const cache = exploreCache[cacheKey];
+  const grid = document.getElementById('exploreDrillGrid');
+  if(!cache || !grid) return;
+  const visible = cache.rawItems.filter(it => !STATE.library.some(li => li.tmdb_id === it.id && li.media_type === it.media_type));
+  const hasMore = cache.page < cache.totalPages;
+
+  if(!visible.length && !hasMore){
+    grid.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`;
+    return;
+  }
+
+  grid.innerHTML = '';
+  visible.forEach(it => grid.appendChild(buildExploreCardEl(it)));
+
+  if(hasMore){
+    const wrap = document.createElement('div');
+    wrap.className = 'load-more-wrap';
+    wrap.innerHTML = `<button class="load-more-btn" id="exploreDrillLoadMore">Cargar más</button>`;
+    grid.appendChild(wrap);
+    document.getElementById('exploreDrillLoadMore').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = 'Cargando…';
+      await fetchNextExplorePage(cacheKey);
+      renderExploreDrillGrid(cacheKey);
+    });
   }
 }
 
@@ -1563,6 +1688,7 @@ function enterHome(){
   weekViewActive = false;
   exploreViewActive = false;
   watchedViewActive = false;
+  exploreDrill = null;
   document.getElementById('librarySearch').value = '';
   resetPagination();
   renderLibrary();
@@ -1573,6 +1699,7 @@ function enterCategory(categoryKey){
   weekViewActive = false;
   exploreViewActive = false;
   watchedViewActive = false;
+  exploreDrill = null;
   resetPagination();
   renderLibrary();
 }
