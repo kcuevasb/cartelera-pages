@@ -375,11 +375,6 @@
   }
   .explore-load-more:hover{color:var(--text);border-color:var(--text-dim);}
 
-  @media (max-width: 640px){
-    .explore-card{flex-basis:104px;}
-    .explore-card img{width:104px;height:156px;}
-  }
-
   /* ---------- RATING STARS ---------- */
   .rating-row{display:flex;align-items:center;gap:4px;margin:12px 0 4px;}
   .star-btn{background:none;border:none;font-size:18px;color:var(--border-strong);padding:0;line-height:1;}
@@ -449,17 +444,97 @@
   .card:focus-within .type-badge{opacity:1;}
   .card:focus-within .remove-btn{opacity:1;}
 
-  @media (max-width: 640px){
-    .continue-card{flex-basis:92px;}
-    .continue-card img{width:92px;height:138px;}
+  /* ==================================================================
+     TÁCTIL: cualquier dispositivo sin hover real (móvil, tablet, portátiles
+     táctiles). No depende del ancho de pantalla — una tablet en horizontal
+     es ancha pero sigue siendo táctil, así que esto se detecta aparte.
+     ================================================================== */
+  @media (hover: none), (pointer: coarse){
+    /* el hover para revelar controles no existe al tocar: se quedan siempre visibles */
+    .type-badge{opacity:1;}
+    .remove-btn{opacity:1;background:rgba(0,0,0,.65);}
+    .continue-card, .explore-card{cursor:default;}
+
+    /* objetivos táctiles más grandes en controles pequeños */
+    .icon-btn{padding:10px 12px;}
+    .close-x{padding:10px;font-size:20px;}
+    .remove-btn{width:26px;height:26px;}
+    .season-toggle{padding:8px;}
+    .star-btn{font-size:22px;padding:6px;}
+    .ep-row{padding:10px 0;}
+    .ep-check{width:20px;height:20px;}
+    .mini-btn{padding:8px 0;}
+    .shelf-viewall, .back-home-btn{padding:8px 11px;}
+    .view-toggle, .week-toggle, .top-tabs .tab{padding-top:6px;padding-bottom:6px;}
   }
 
-  @media (max-width: 640px){
-    .grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:20px 14px;}
-    .marquee{padding:16px 16px 0;}
-    main{padding:0 16px 60px;}
-    .stub{gap:22px;}
+  /* ---------- TABLET ---------- */
+  @media (max-width: 900px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+    .detail-hero img{width:76px;height:114px;}
   }
+
+  /* ---------- MÓVIL ---------- */
+  @media (max-width: 640px){
+    html, body{overflow-x:hidden;}
+    .marquee{padding:14px 16px 0;}
+    main{padding:0 16px 60px;}
+
+    .marquee-top{gap:10px;padding-bottom:14px;}
+    .marquee-title{font-size:17px;}
+    .marquee-actions{gap:4px;}
+    .icon-btn{font-size:11.5px;padding:9px 10px;}
+    .btn-primary{padding:8px 12px;font-size:12px;}
+
+    .top-tabs{gap:16px;padding-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;}
+    .top-tabs .tab{white-space:nowrap;font-size:14px;}
+
+    .stub{gap:18px 24px;}
+
+    /* barra de herramientas: el buscador ocupa su propia fila entera,
+       el resto de controles se reparte debajo en filas cortas */
+    .toolbar-row{padding-bottom:10px;}
+    .lib-search{flex-basis:100%;order:-1;margin-bottom:2px;}
+    .genre-select, .sort-select, .view-toggle, .week-toggle{flex-shrink:0;}
+
+    .section-heading-row{padding:14px 0 12px;}
+    .section-heading-left h2{font-size:17px;}
+
+    .grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:18px 12px;}
+    .card-title{font-size:12px;}
+
+    .continue-card{flex-basis:100px;}
+    .continue-card img{width:100px;height:150px;}
+    .explore-card{flex-basis:112px;}
+    .explore-card img{width:112px;height:168px;}
+    .continue-row, .explore-row{-webkit-overflow-scrolling:touch;}
+
+    /* que el modal respire en pantallas pequeñas y no se pegue a los bordes */
+    .overlay{padding:4vh 10px;align-items:flex-end;}
+    .modal{padding:18px 16px;max-height:92vh;overflow-y:auto;border-radius:12px 12px 0 0;}
+    .detail-hero{gap:12px;}
+    .detail-hero img{width:72px;height:108px;}
+    .status-select-row{gap:8px;}
+    .status-choice{padding:8px 12px;}
+    .season-head{flex-wrap:wrap;row-gap:8px;padding:12px 0;}
+    .season-head-left{flex-wrap:wrap;row-gap:6px;}
+    .ep-name{white-space:normal;}
+
+    /* evitar que iOS haga zoom automático al enfocar campos de texto */
+    .lib-search, .genre-select, .sort-select, .field input, .field select,
+    .notes-field textarea, #apiKeyInput, #searchInput{
+      font-size:16px;
+    }
+
+    .toast{
+      left:16px;right:16px;transform:none;text-align:center;
+      bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .toast.show{transform:translateY(-4px);}
+
+    footer{padding-left:16px;padding-right:16px;padding-bottom:env(safe-area-inset-bottom, 0px);}
+  }
+
   @media (prefers-reduced-motion: reduce){
     *{transition:none !important;}
   }
