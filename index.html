@@ -99,6 +99,27 @@
   .tab:hover:not(.active){color:var(--text-dim);}
   .sync-note{font-size:11px;color:var(--text-faint);font-family:var(--font-mono);}
 
+  /* ---------- SECTION HEADING (Viendo / categoría + volver a inicio) ---------- */
+  .section-heading-row{
+    max-width:1040px;margin:0 auto;padding:18px 0 14px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    border-top:1px solid var(--border);
+  }
+  .section-heading-left{display:flex;align-items:center;gap:12px;}
+  .section-heading-left h2{font-family:var(--font-display);font-weight:500;font-size:19px;margin:0;color:var(--text);}
+  .back-home-btn{
+    background:none;border:1px solid var(--border-strong);color:var(--text-dim);
+    border-radius:5px;padding:5px 11px;font-size:12px;font-weight:500;
+  }
+  .back-home-btn:hover{color:var(--text);border-color:var(--text-dim);}
+
+  /* ---------- HOME SHELVES (Pendientes / Películas / Completadas / Abandonadas) ---------- */
+  .home-shelves{margin-top:8px;}
+  .shelf-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
+  .shelf-count{color:var(--text-faint);font-weight:400;}
+  .shelf-viewall{background:none;border:none;color:var(--text-faint);font-size:11.5px;text-decoration:underline;}
+  .shelf-viewall:hover{color:var(--text);}
+
   main{max-width:1040px;margin:0 auto;padding:0 28px 60px;}
 
   /* ---------- LIBRARY GRID ---------- */
@@ -117,6 +138,11 @@
     opacity:0;transition:opacity .12s;
   }
   .card:hover .type-badge{opacity:1;}
+  .new-badge{
+    position:absolute;top:6px;left:6px;font-size:9px;font-weight:700;letter-spacing:.4px;
+    text-transform:uppercase;color:#151515;background:var(--accent);
+    padding:2px 6px;border-radius:3px;z-index:2;
+  }
   .remove-btn{
     position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:3px;
     background:rgba(0,0,0,.55);border:none;color:rgba(255,255,255,.7);
@@ -148,6 +174,8 @@
   }
   .mini-btn:hover{color:var(--text);}
   .mini-btn.primary{color:var(--text);}
+  .mini-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .mini-btn:disabled:hover{color:var(--text-dim);}
   .mini-btn + .mini-btn{text-align:right;}
 
   .empty-state{
@@ -227,6 +255,9 @@
   }
   .ep-row.watched .ep-check{background:var(--accent);border-color:var(--accent);color:#151515;}
   .ep-row.watched{color:var(--text-faint);}
+  .ep-row.unaired{opacity:.5;cursor:not-allowed;}
+  .ep-row.unaired .ep-date{color:var(--accent);}
+  .ep-row:not(.unaired){cursor:pointer;}
   .ep-num{color:var(--text-faint);font-family:var(--font-mono);width:20px;flex-shrink:0;}
   .ep-name{flex:1;min-width:0;}
   .ep-date{color:var(--text-faint);font-family:var(--font-mono);font-size:10.5px;flex-shrink:0;}
@@ -307,6 +338,29 @@
   .week-entry-title{font-size:13px;font-weight:500;}
   .week-entry-meta{font-size:11px;color:var(--text-faint);font-family:var(--font-mono);}
   .week-empty{font-size:12.5px;color:var(--text-faint);padding:30px 0;text-align:center;}
+
+  /* ---------- EXPLORAR ---------- */
+  .explore-view{display:none;margin-top:20px;}
+  .explore-view.show{display:block;}
+  .explore-type-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:18px;}
+  .explore-section{margin-bottom:26px;}
+  .explore-label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+  .explore-row{display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;}
+  .explore-card{flex:0 0 130px;}
+  .explore-card img{width:130px;height:195px;object-fit:cover;border-radius:3px;display:block;background:#0d0d0d;filter:saturate(.92);}
+  .explore-card .ec-title{font-size:12px;font-weight:600;margin-top:7px;line-height:1.3;}
+  .explore-card .ec-meta{font-size:10.5px;color:var(--text-faint);font-family:var(--font-mono);margin-top:2px;}
+  .explore-add-btn{
+    margin-top:7px;width:100%;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
+    border-radius:5px;padding:6px 0;font-size:11px;font-weight:500;
+  }
+  .explore-add-btn:hover{color:var(--text);border-color:var(--text-dim);}
+  .explore-add-btn:disabled{opacity:.45;}
+
+  @media (max-width: 640px){
+    .explore-card{flex-basis:104px;}
+    .explore-card img{width:104px;height:156px;}
+  }
 
   /* ---------- RATING STARS ---------- */
   .rating-row{display:flex;align-items:center;gap:4px;margin:12px 0 4px;}
@@ -442,22 +496,19 @@
       <option value="alpha">Alfabético</option>
     </select>
     <button class="view-toggle" id="viewToggleBtn">Vista lista</button>
+    <button class="week-toggle" id="exploreViewBtn" aria-label="Explorar catálogo de TMDB">🔍 Explorar</button>
     <button class="week-toggle" id="weekViewBtn">Vista semanal</button>
   </div>
 
-  <div class="continue-section hidden" id="continueSection">
-    <div class="continue-label">Continuar viendo</div>
-    <div class="continue-row" id="continueRow"></div>
+  <div class="continue-section hidden" id="newEpisodesShelf">
+    <div class="continue-label">📺 Episodios nuevos</div>
+    <div class="continue-row" id="newEpisodesRow"></div>
   </div>
 
-  <div class="filters">
-    <div class="tabs" id="tabs">
-      <button class="tab active" data-filter="all">Todo</button>
-      <button class="tab" data-filter="watching">Viendo</button>
-      <button class="tab" data-filter="watchlist">Pendientes</button>
-      <button class="tab" data-filter="completed">Completadas</button>
-      <button class="tab" data-filter="movie">Películas</button>
-      <button class="tab" data-filter="dropped">Abandonadas</button>
+  <div class="section-heading-row" id="sectionHeadingRow">
+    <div class="section-heading-left">
+      <button class="back-home-btn hidden" id="backHomeBtn">← Inicio</button>
+      <h2 id="sectionHeadingTitle">Viendo</h2>
     </div>
     <div class="sync-note" id="syncNote">—</div>
   </div>
@@ -474,7 +525,17 @@
     <p>Añade tu primera serie o película y Cartelera se encargará de avisarte de los episodios nuevos.</p>
   </div>
 
+  <div class="home-shelves" id="homeShelves"></div>
+
   <div class="week-view" id="weekView"></div>
+
+  <div class="explore-view" id="exploreView">
+    <div class="explore-type-tabs" id="exploreTypeTabs">
+      <button class="tab active" data-media="movie">Películas</button>
+      <button class="tab" data-media="tv">Series</button>
+    </div>
+    <div id="exploreSections"></div>
+  </div>
 </main>
 
 <footer>Datos de series y películas proporcionados por TMDB. Este producto usa la API de TMDB pero no está respaldado ni certificado por TMDB. Todo se guarda de forma privada, sin componentes sociales.</footer>
@@ -584,6 +645,22 @@ let STATE = { apiKey: null, library: [], theme: 'dark', sortMode: 'added_desc', 
 let currentFilter = 'all';
 let librarySearch = '';
 let weekViewActive = false;
+let exploreViewActive = false;
+let exploreMediaType = 'movie';
+const exploreCache = {};
+
+const MOVIE_EXPLORE_SECTIONS = [
+  { key:'now_playing', label:'Últimos estrenos', path:'/movie/now_playing' },
+  { key:'upcoming', label:'Próximamente', path:'/movie/upcoming' },
+  { key:'trending', label:'Tendencia esta semana', path:'/trending/movie/week' },
+  { key:'classics', label:'Clásicos', path:'/discover/movie', extraParams:{ sort_by:'vote_average.desc', 'vote_count.gte':'2000', 'primary_release_date.lte':'2005-12-31' } }
+];
+const TV_EXPLORE_SECTIONS = [
+  { key:'on_the_air', label:'Últimos estrenos', path:'/tv/on_the_air' },
+  { key:'trending', label:'Tendencia esta semana', path:'/trending/tv/week' },
+  { key:'top_rated', label:'Mejor valoradas', path:'/tv/top_rated' },
+  { key:'classics', label:'Clásicos', path:'/discover/tv', extraParams:{ sort_by:'vote_average.desc', 'vote_count.gte':'800', 'first_air_date.lte':'2005-12-31' } }
+];
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE = 'https://image.tmdb.org/t/p/w342';
 const seasonCache = {}; // key: `${tmdb_id}-${season_number}` -> episodes array (in-memory only)
@@ -1033,6 +1110,7 @@ document.getElementById('importCsvInput').addEventListener('change', (e)=>{
 /* ---- library search & sort ---- */
 document.getElementById('librarySearch').addEventListener('input', (e)=>{
   librarySearch = e.target.value.trim().toLowerCase();
+  if(librarySearch && homeMode){ homeMode = false; currentFilter = 'all'; }
   resetPagination();
   renderLibrary();
 });
@@ -1043,6 +1121,7 @@ document.getElementById('sortSelect').addEventListener('change', async (e)=>{
 });
 document.getElementById('genreSelect').addEventListener('change', (e)=>{
   currentGenre = e.target.value;
+  if(currentGenre && homeMode){ homeMode = false; currentFilter = 'all'; }
   resetPagination();
   renderLibrary();
 });
@@ -1050,9 +1129,91 @@ document.getElementById('genreSelect').addEventListener('change', (e)=>{
 /* ---- week view toggle ---- */
 document.getElementById('weekViewBtn').addEventListener('click', ()=>{
   weekViewActive = !weekViewActive;
-  document.getElementById('weekViewBtn').classList.toggle('active', weekViewActive);
+  if(weekViewActive) exploreViewActive = false;
   renderLibrary();
 });
+
+/* ---- explore view toggle ---- */
+document.getElementById('exploreViewBtn').addEventListener('click', ()=>{
+  exploreViewActive = !exploreViewActive;
+  if(exploreViewActive) weekViewActive = false;
+  renderLibrary();
+});
+document.getElementById('exploreTypeTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab');
+  if(!btn) return;
+  document.querySelectorAll('#exploreTypeTabs .tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  exploreMediaType = btn.dataset.media;
+  renderExploreView();
+});
+
+async function fetchExploreSection(mediaType, section){
+  const cacheKey = `${mediaType}:${section.key}`;
+  if(exploreCache[cacheKey]) return exploreCache[cacheKey];
+  const data = await tmdbFetch(section.path, section.extraParams || {});
+  const results = (data.results||[]).slice(0,12).map(r=>({
+    id: r.id,
+    media_type: mediaType,
+    title: mediaType === 'movie' ? r.title : r.name,
+    date: mediaType === 'movie' ? r.release_date : r.first_air_date,
+    poster_path: r.poster_path,
+    vote_average: r.vote_average
+  }));
+  exploreCache[cacheKey] = results;
+  return results;
+}
+
+async function renderExploreView(){
+  const container = document.getElementById('exploreSections');
+  if(!STATE.apiKey){
+    container.innerHTML = `<p class="help-text">Configura tu clave de TMDB en Ajustes para poder explorar el catálogo.</p>`;
+    return;
+  }
+  const sections = exploreMediaType === 'movie' ? MOVIE_EXPLORE_SECTIONS : TV_EXPLORE_SECTIONS;
+  container.innerHTML = sections.map(s=>`
+    <div class="explore-section">
+      <div class="explore-label">${s.label}</div>
+      <div class="explore-row" id="explore-row-${s.key}"><p class="loader-line">Cargando…</p></div>
+    </div>
+  `).join('');
+  for(const s of sections){
+    const row = document.getElementById(`explore-row-${s.key}`);
+    try{
+      const items = await fetchExploreSection(exploreMediaType, s);
+      renderExploreRow(s.key, items);
+    }catch(err){
+      console.error('Error cargando sección de Explorar', s.key, err);
+      if(row) row.innerHTML = `<p class="help-text">No se pudo cargar esta sección. Revisa tu clave de API.</p>`;
+    }
+  }
+}
+
+function renderExploreRow(sectionKey, items){
+  const row = document.getElementById(`explore-row-${sectionKey}`);
+  if(!row) return;
+  if(!items.length){ row.innerHTML = `<p class="help-text">Sin resultados.</p>`; return; }
+  row.innerHTML = items.map(it=>{
+    const already = STATE.library.some(li => li.tmdb_id === it.id && li.media_type === it.media_type);
+    const year = it.date ? it.date.slice(0,4) : 's/f';
+    return `
+      <div class="explore-card">
+        ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:130px;height:195px;background:#0d0d0d;border-radius:3px;"></div>`}
+        <div class="ec-title">${escapeHtml(it.title||'')}</div>
+        <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
+        <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" ${already?'disabled':''}>${already?'Añadida':'Añadir'}</button>
+      </div>
+    `;
+  }).join('');
+  row.querySelectorAll('[data-explore-id]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true;
+      btn.textContent = 'Añadiendo…';
+      await addItem({ id: Number(btn.dataset.exploreId), media_type: btn.dataset.exploreType });
+      btn.textContent = 'Añadida';
+    });
+  });
+}
 
 /* ============ TV LOGIC: progress / next unseen episode ============ */
 function airedEpisodeCount(item){
@@ -1084,6 +1245,31 @@ function markEpisode(item, season_number, episode_number, watched){
   if(!watched && idx !== -1) item.watched.splice(idx,1);
   if(watched) item.last_watched_at = Date.now();
 }
+/**
+ * ¿Se ha emitido ya un episodio concreto? Si tenemos su fecha exacta (porque
+ * se cargó el listado de la temporada), se usa esa. Si no, nos apoyamos en
+ * next_episode_to_air de TMDB: cualquier episodio anterior a ese ya se emitió
+ * seguro; el propio next_episode_to_air solo cuenta como emitido si su fecha
+ * ya ha pasado.
+ */
+function isEpisodeAired(item, seasonNumber, episodeNumber, explicitAirDate){
+  const today = todayISO();
+  if(explicitAirDate) return explicitAirDate <= today;
+  const next = item.next_episode_to_air;
+  if(!next) return true;
+  const isAtOrAfterNext = (seasonNumber > next.season_number) ||
+    (seasonNumber === next.season_number && episodeNumber >= next.episode_number);
+  if(!isAtOrAfterNext) return true;
+  return next.air_date ? next.air_date <= today : false;
+}
+/** ¿Hay un episodio recién estrenado de esta serie que aún no has visto? */
+function hasFreshUnwatchedEpisode(item){
+  if(item.media_type !== 'tv' || item.status !== 'watching') return false;
+  const next = item.next_episode_to_air;
+  if(!next || !next.air_date || next.air_date > todayISO()) return false;
+  const code = `S${next.season_number}E${next.episode_number}`;
+  return !item.watched.includes(code);
+}
 
 /* ============ STATS ============ */
 function computeStats(){
@@ -1113,21 +1299,33 @@ function computeStats(){
 }
 
 /* ============ RENDER LIBRARY ============ */
-document.getElementById('tabs').addEventListener('click', (e)=>{
-  const btn = e.target.closest('.tab');
-  if(!btn) return;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  currentFilter = btn.dataset.filter;
-  resetPagination();
-  renderLibrary();
-});
-
+let homeMode = true;
 let currentGenre = '';
 let renderedCount = 24;
 const PAGE_SIZE = 24;
 
 function resetPagination(){ renderedCount = PAGE_SIZE; }
+
+function enterHome(){
+  homeMode = true;
+  currentFilter = 'all';
+  librarySearch = '';
+  currentGenre = '';
+  document.getElementById('librarySearch').value = '';
+  resetPagination();
+  renderLibrary();
+}
+function enterCategory(categoryKey){
+  homeMode = false;
+  currentFilter = categoryKey;
+  resetPagination();
+  renderLibrary();
+}
+document.getElementById('backHomeBtn').addEventListener('click', enterHome);
+
+function categoryLabel(key){
+  return ({ all:'Todo', watching:'Viendo', watchlist:'Pendientes', completed:'Completadas', movie:'Películas', dropped:'Abandonadas' })[key] || 'Biblioteca';
+}
 
 function filteredLibrary(){
   let items;
@@ -1193,24 +1391,62 @@ function renderLibrary(){
   const empty = document.getElementById('emptyState');
   const weekView = document.getElementById('weekView');
   const weekBtn = document.getElementById('weekViewBtn');
-  const continueSection = document.getElementById('continueSection');
+  const exploreView = document.getElementById('exploreView');
+  const exploreBtn = document.getElementById('exploreViewBtn');
+  const newEpisodesShelf = document.getElementById('newEpisodesShelf');
+  const homeShelves = document.getElementById('homeShelves');
+  const headingRow = document.getElementById('sectionHeadingRow');
+  const backHomeBtn = document.getElementById('backHomeBtn');
+  const sectionTitle = document.getElementById('sectionHeadingTitle');
   weekBtn.classList.toggle('active', weekViewActive);
+  exploreBtn.classList.toggle('active', exploreViewActive);
+
+  if(exploreViewActive){
+    grid.classList.add('hidden');
+    empty.classList.add('hidden');
+    newEpisodesShelf.classList.add('hidden');
+    homeShelves.classList.add('hidden');
+    headingRow.classList.add('hidden');
+    weekView.classList.remove('show');
+    exploreView.classList.add('show');
+    renderExploreView();
+    return;
+  }
+  exploreView.classList.remove('show');
 
   if(weekViewActive){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
-    continueSection.classList.add('hidden');
+    newEpisodesShelf.classList.add('hidden');
+    homeShelves.classList.add('hidden');
+    headingRow.classList.add('hidden');
     weekView.classList.add('show');
     renderWeekView();
     return;
   }
   weekView.classList.remove('show');
-
-  renderContinueWatching();
+  headingRow.classList.remove('hidden');
 
   grid.classList.toggle('list-mode', STATE.viewMode === 'list');
 
-  const allItems = filteredLibrary();
+  let items, emptyMsg;
+  if(homeMode){
+    backHomeBtn.classList.add('hidden');
+    sectionTitle.textContent = 'Viendo';
+    renderNewEpisodesShelf();
+    homeShelves.classList.remove('hidden');
+    renderHomeShelves();
+    items = sortItems(STATE.library.filter(i=>i.status==='watching'));
+    emptyMsg = 'No tienes ninguna serie o película en "Viendo" ahora mismo. Añade algo o mira las estanterías de abajo.';
+  } else {
+    backHomeBtn.classList.remove('hidden');
+    sectionTitle.textContent = categoryLabel(currentFilter);
+    newEpisodesShelf.classList.add('hidden');
+    homeShelves.classList.add('hidden');
+    items = filteredLibrary();
+    emptyMsg = 'Nada por aquí. Prueba otra búsqueda o género.';
+  }
+
   grid.innerHTML = '';
   if(!STATE.library.length){
     empty.classList.remove('hidden');
@@ -1219,17 +1455,17 @@ function renderLibrary(){
   }
   empty.classList.add('hidden');
   grid.classList.remove('hidden');
-  if(!allItems.length){
-    grid.innerHTML = `<p class="help-text" style="grid-column:1/-1;">Nada por aquí. Prueba otra pestaña, género o búsqueda.</p>`;
+  if(!items.length){
+    grid.innerHTML = `<p class="help-text" style="grid-column:1/-1;">${emptyMsg}</p>`;
     return;
   }
-  const visible = allItems.slice(0, renderedCount);
+  const visible = items.slice(0, renderedCount);
   visible.forEach(item=> grid.appendChild(buildCard(item)));
 
-  if(allItems.length > visible.length){
+  if(items.length > visible.length){
     const wrap = document.createElement('div');
     wrap.className = 'load-more-wrap';
-    wrap.innerHTML = `<button class="load-more-btn" id="loadMoreBtn">Cargar más (${allItems.length - visible.length} restantes)</button>`;
+    wrap.innerHTML = `<button class="load-more-btn" id="loadMoreBtn">Cargar más (${items.length - visible.length} restantes)</button>`;
     grid.appendChild(wrap);
     document.getElementById('loadMoreBtn').addEventListener('click', ()=>{
       renderedCount += PAGE_SIZE;
@@ -1238,36 +1474,75 @@ function renderLibrary(){
   }
 }
 
-/* ---- continuar viendo ---- */
-function renderContinueWatching(){
-  const section = document.getElementById('continueSection');
-  const row = document.getElementById('continueRow');
-  if(currentFilter !== 'all' || librarySearch || currentGenre){
-    section.classList.add('hidden');
-    return;
-  }
-  const candidates = STATE.library
-    .filter(i => i.media_type === 'tv' && i.status === 'watching' && nextUnwatchedEpisode(i))
-    .sort((a,b)=> (b.last_watched_at||0) - (a.last_watched_at||0))
-    .slice(0, 8);
-  if(!candidates.length){ section.classList.add('hidden'); return; }
-  section.classList.remove('hidden');
-  row.innerHTML = candidates.map(item=>{
-    const total = totalEpisodeCount(item) || 1;
-    const pct = Math.min(100, Math.round((item.watched.length/total)*100));
-    const next = nextUnwatchedEpisode(item);
+function wireShelfCardOpenHandlers(row){
+  row.querySelectorAll('[data-open]').forEach(el=>{
+    el.addEventListener('click', ()=> openDetail(el.dataset.open));
+    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(el.dataset.open); } });
+  });
+}
+
+/* ---- episodios nuevos ---- */
+function renderNewEpisodesShelf(){
+  const container = document.getElementById('newEpisodesShelf');
+  const row = document.getElementById('newEpisodesRow');
+  const items = STATE.library.filter(hasFreshUnwatchedEpisode);
+  if(!items.length){ container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  row.innerHTML = items.map(item=>{
+    const next = item.next_episode_to_air;
     return `
       <div class="continue-card" data-open="${item.uid}" tabindex="0" role="button" aria-label="Abrir ${escapeHtml(item.title)}">
         ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="">` : `<div style="width:110px;height:165px;background:#0d0d0d;border-radius:3px;"></div>`}
         <div class="cc-title">${escapeHtml(item.title)}</div>
-        <div class="cc-meta">${next ? `T${next.season_number}E${next.episode_number}` : ''}</div>
-        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="cc-meta">T${next.season_number}E${next.episode_number} · ${fmtDate(next.air_date)}</div>
       </div>
     `;
   }).join('');
-  row.querySelectorAll('[data-open]').forEach(el=>{
-    el.addEventListener('click', ()=> openDetail(el.dataset.open));
-    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(el.dataset.open); } });
+  wireShelfCardOpenHandlers(row);
+}
+
+/* ---- estanterías del home: Pendientes / Películas / Completadas / Abandonadas ---- */
+function renderHomeShelves(){
+  const shelfDefs = [
+    { key:'watchlist', label:'Pendientes', items: STATE.library.filter(i=>i.status==='watchlist') },
+    { key:'movie', label:'Películas', items: STATE.library.filter(i=>i.media_type==='movie') },
+    { key:'completed', label:'Completadas', items: STATE.library.filter(i=>i.status==='completed') },
+    { key:'dropped', label:'Abandonadas', items: STATE.library.filter(i=>i.status==='dropped') }
+  ].filter(s=>s.items.length);
+
+  const container = document.getElementById('homeShelves');
+  if(!shelfDefs.length){ container.innerHTML = ''; return; }
+
+  container.innerHTML = shelfDefs.map(s=>`
+    <div class="continue-section" style="margin-top:26px;">
+      <div class="shelf-header">
+        <span class="continue-label" style="margin-bottom:0;">${escapeHtml(s.label)} <span class="shelf-count">(${s.items.length})</span></span>
+        <button class="shelf-viewall" data-category="${s.key}">Ver todas →</button>
+      </div>
+      <div class="continue-row" id="shelf-row-${s.key}"></div>
+    </div>
+  `).join('');
+
+  shelfDefs.forEach(s=>{
+    const row = document.getElementById(`shelf-row-${s.key}`);
+    const sorted = sortItems(s.items).slice(0, 12);
+    row.innerHTML = sorted.map(item=>{
+      const meta = item.media_type === 'movie'
+        ? (item.runtime ? `${item.runtime} min` : '')
+        : `${item.watched.length}/${totalEpisodeCount(item)} episodios`;
+      return `
+        <div class="continue-card" data-open="${item.uid}" tabindex="0" role="button" aria-label="Abrir ${escapeHtml(item.title)}">
+          ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="">` : `<div style="width:110px;height:165px;background:#0d0d0d;border-radius:3px;"></div>`}
+          <div class="cc-title">${escapeHtml(item.title)}</div>
+          <div class="cc-meta">${meta}</div>
+        </div>
+      `;
+    }).join('');
+    wireShelfCardOpenHandlers(row);
+  });
+
+  container.querySelectorAll('[data-category]').forEach(btn=>{
+    btn.addEventListener('click', ()=> enterCategory(btn.dataset.category));
   });
 }
 
@@ -1371,6 +1646,7 @@ function buildCard(item){
   card.className = 'card';
 
   let progressPct = 0, metaLine = '', nextLine = '';
+  let nextEp = null, nextEpAired = true;
   if(item.media_type === 'tv'){
     const total = totalEpisodeCount(item) || 1;
     progressPct = Math.min(100, Math.round((item.watched.length/total)*100));
@@ -1382,6 +1658,8 @@ function buildCard(item){
     } else {
       nextLine = 'En emisión';
     }
+    nextEp = nextUnwatchedEpisode(item);
+    if(nextEp) nextEpAired = isEpisodeAired(item, nextEp.season_number, nextEp.episode_number);
   } else {
     progressPct = item.watched_movie ? 100 : 0;
     metaLine = item.runtime ? `${item.runtime} min` : '';
@@ -1389,11 +1667,26 @@ function buildCard(item){
   }
 
   const statusLabels = { watching:'Viendo', watchlist:'Pendiente', completed:'Completada', dropped:'Abandonada' };
+  const isFresh = hasFreshUnwatchedEpisode(item);
+
+  let nextBtnHtml;
+  if(item.media_type === 'tv'){
+    if(!nextEp){
+      nextBtnHtml = `<button class="mini-btn primary" data-action="next-ep" disabled>Al día</button>`;
+    } else if(!nextEpAired){
+      nextBtnHtml = `<button class="mini-btn" data-action="next-ep" disabled title="Aún no se ha emitido">Aún no emitido</button>`;
+    } else {
+      nextBtnHtml = `<button class="mini-btn primary" data-action="next-ep">✓ Siguiente ep.</button>`;
+    }
+  } else {
+    nextBtnHtml = `<button class="mini-btn primary" data-action="toggle-movie">${item.watched_movie ? '✓ Vista' : 'Marcar vista'}</button>`;
+  }
 
   card.innerHTML = `
     <div class="card-body">
       <div class="poster-wrap">
         <div class="type-badge ${item.media_type}">${item.media_type==='tv'?'Serie':'Peli'}</div>
+        ${isFresh ? `<div class="new-badge">Nuevo</div>` : ''}
         <button class="remove-btn" title="Quitar" aria-label="Quitar de la biblioteca">✕</button>
         ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="">` : `<div class="poster-placeholder">${escapeHtml(item.title)}</div>`}
       </div>
@@ -1404,10 +1697,7 @@ function buildCard(item){
         <span class="status-pill status-${item.status}">${statusLabels[item.status]}</span>
         <div class="next-ep"><span>${nextLine}</span></div>
         <div class="card-actions">
-          ${item.media_type === 'tv'
-            ? `<button class="mini-btn primary" data-action="next-ep">${nextUnwatchedEpisode(item) ? '✓ Siguiente ep.' : 'Al día'}</button>`
-            : `<button class="mini-btn primary" data-action="toggle-movie">${item.watched_movie ? '✓ Vista' : 'Marcar vista'}</button>`
-          }
+          ${nextBtnHtml}
           <button class="mini-btn" data-action="open-detail">Detalle</button>
         </div>
       </div>
@@ -1422,11 +1712,16 @@ function buildCard(item){
   });
 
   const nextBtn = card.querySelector('[data-action="next-ep"]');
-  if(nextBtn){
+  if(nextBtn && !nextBtn.disabled){
     nextBtn.addEventListener('click', async (e)=>{
       e.stopPropagation();
       const next = nextUnwatchedEpisode(item);
       if(!next){ showToast('Ya estás al día con esta serie.'); return; }
+      if(!isEpisodeAired(item, next.season_number, next.episode_number)){
+        showToast('Ese episodio todavía no se ha emitido.');
+        renderLibrary();
+        return;
+      }
       markEpisode(item, next.season_number, next.episode_number, true);
       if(item.status === 'watchlist') item.status = 'watching';
       if(!nextUnwatchedEpisode(item) && (item.tmdb_status === 'Ended' || item.tmdb_status === 'Canceled')){
@@ -1452,6 +1747,7 @@ function buildCard(item){
     e.stopPropagation();
     openDetail(item.uid);
   });
+
 
   return card;
 }
@@ -1579,15 +1875,17 @@ function openDetail(uid){
           list.innerHTML = `<p class="loader-line">Cargando episodios…</p>`;
           try{
             const eps = await fetchSeasonEpisodes(item.tmdb_id, sn);
+            const today = todayISO();
             list.innerHTML = eps.map(ep=>{
               const code = `S${sn}E${ep.episode_number}`;
               const watched = item.watched.includes(code);
+              const aired = !ep.air_date || ep.air_date <= today;
               return `
-                <div class="ep-row ${watched?'watched':''}" data-code="${code}">
+                <div class="ep-row ${watched?'watched':''} ${aired?'':'unaired'}" data-code="${code}" data-air-date="${ep.air_date||''}">
                   <div class="ep-check">✓</div>
                   <div class="ep-num">${ep.episode_number}</div>
                   <div class="ep-name">${escapeHtml(ep.name||'Episodio '+ep.episode_number)}</div>
-                  <div class="ep-date">${fmtDate(ep.air_date)}</div>
+                  <div class="ep-date">${aired ? fmtDate(ep.air_date) : `Estreno ${fmtDate(ep.air_date)}`}</div>
                 </div>
               `;
             }).join('') || `<p class="loader-line">Sin datos de episodios.</p>`;
@@ -1596,6 +1894,10 @@ function openDetail(uid){
               row.addEventListener('click', async ()=>{
                 const code = row.dataset.code;
                 const nowWatched = !row.classList.contains('watched');
+                if(nowWatched && row.classList.contains('unaired')){
+                  showToast(`Ese episodio se estrena el ${fmtDate(row.dataset.airDate)}, todavía no puedes marcarlo.`);
+                  return;
+                }
                 const [,season,ep] = code.match(/S(\d+)E(\d+)/);
                 markEpisode(item, Number(season), Number(ep), nowWatched);
                 row.classList.toggle('watched', nowWatched);
@@ -1617,18 +1919,38 @@ function openDetail(uid){
         const sn = Number(btn.dataset.seasonMark);
         const season = item.seasons.find(s=>s.season_number===sn);
         if(!season) return;
-        for(let ep=1; ep<=season.episode_count; ep++){
-          markEpisode(item, sn, ep, true);
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = 'Comprobando…';
+        let skipped = 0, marked = 0;
+        try{
+          const eps = await fetchSeasonEpisodes(item.tmdb_id, sn);
+          const today = todayISO();
+          const airedByEpisode = {};
+          eps.forEach(ep=> airedByEpisode[ep.episode_number] = !ep.air_date || ep.air_date <= today);
+          for(let ep=1; ep<=season.episode_count; ep++){
+            const aired = airedByEpisode.hasOwnProperty(ep) ? airedByEpisode[ep] : true;
+            if(aired){ markEpisode(item, sn, ep, true); marked++; }
+            else { skipped++; }
+          }
+        }catch(err){
+          // sin datos de episodios: nos quedamos con el criterio general (bloquea solo si coincide con next_episode_to_air futuro)
+          for(let ep=1; ep<=season.episode_count; ep++){
+            if(isEpisodeAired(item, sn, ep)){ markEpisode(item, sn, ep, true); marked++; }
+            else { skipped++; }
+          }
         }
-        if(item.status === 'watchlist') item.status = 'watching';
+        if(item.status === 'watchlist' && marked>0) item.status = 'watching';
         await saveLibrary();
         renderLibrary();
         refreshSeasonHeader(item, sn);
-        // si la lista de episodios de esta temporada ya estaba cargada, marca todas las filas visualmente
         const list = document.getElementById(`episodes-${sn}`);
         if(list && list.dataset.loaded){
-          list.querySelectorAll('.ep-row').forEach(row=> row.classList.add('watched'));
+          list.querySelectorAll('.ep-row:not(.unaired)').forEach(row=> row.classList.add('watched'));
         }
+        btn.disabled = false;
+        btn.textContent = original;
+        if(skipped>0) showToast(`Marcados ${marked}. ${skipped} episodio(s) aún no emitido(s), no se han marcado.`);
       });
     });
   } else {
