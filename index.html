@@ -72,7 +72,7 @@
   .btn-primary:hover{opacity:.85;}
   .btn-primary:active{opacity:.7;}
 
-  /* stat row — plain, no card chrome */
+  /* stat row — plain, no card chrome (ahora vive dentro de Ajustes) */
   .stub{
     max-width:1040px;margin:0 auto;
     display:flex; gap:36px; flex-wrap:wrap;
@@ -82,6 +82,14 @@
   .stub-label{font-size:11px;color:var(--text-faint);}
   .stub-value{font-family:var(--font-mono);font-size:15px;color:var(--text);font-weight:500;}
   .stub-sub{font-size:11px;color:var(--text-faint);}
+
+  /* ---------- TOP TABS (Viendo / Todo / Explorar) ---------- */
+  .top-tabs{
+    max-width:1040px;margin:0 auto;
+    display:flex; gap:26px;
+    padding-bottom:18px;
+  }
+  .top-tabs .tab{font-size:15px;padding:0 0 4px;}
 
   /* ---------- FILTER NAV ---------- */
   .filters{
@@ -459,27 +467,10 @@
       <button class="btn-primary" id="addBtn">Añadir</button>
     </div>
   </div>
-  <div class="stub" id="statsBar">
-    <div class="stub-item">
-      <div class="stub-label">Tiempo total</div>
-      <div class="stub-value" id="statTime">0h</div>
-      <div class="stub-sub" id="statTimeSub">0 días</div>
-    </div>
-    <div class="stub-item">
-      <div class="stub-label">Episodios vistos</div>
-      <div class="stub-value" id="statEpisodes">0</div>
-      <div class="stub-sub">en toda tu biblioteca</div>
-    </div>
-    <div class="stub-item">
-      <div class="stub-label">Pelis vistas</div>
-      <div class="stub-value" id="statMovies">0</div>
-      <div class="stub-sub" id="statMoviesSub">0 h de metraje</div>
-    </div>
-    <div class="stub-item">
-      <div class="stub-label">Ahora viendo</div>
-      <div class="stub-value" id="statWatching">0</div>
-      <div class="stub-sub">series activas</div>
-    </div>
+  <div class="top-tabs" id="topTabs">
+    <button class="tab active" data-top="viendo">Viendo</button>
+    <button class="tab" data-top="all">Todo</button>
+    <button class="tab" data-top="explore">🔍 Explorar</button>
   </div>
 </header>
 
@@ -496,7 +487,6 @@
       <option value="alpha">Alfabético</option>
     </select>
     <button class="view-toggle" id="viewToggleBtn">Vista lista</button>
-    <button class="week-toggle" id="exploreViewBtn" aria-label="Explorar catálogo de TMDB">🔍 Explorar</button>
     <button class="week-toggle" id="weekViewBtn">Vista semanal</button>
   </div>
 
@@ -546,6 +536,32 @@
     <div class="modal-head">
       <h2>Ajustes</h2>
       <button class="close-x" data-close="apiKeyOverlay" aria-label="Cerrar ajustes">✕</button>
+    </div>
+
+    <div class="settings-section">
+      <h3>Estadísticas</h3>
+      <div class="stub" id="statsBar" style="padding-bottom:0;gap:24px;">
+        <div class="stub-item">
+          <div class="stub-label">Tiempo total</div>
+          <div class="stub-value" id="statTime">0h</div>
+          <div class="stub-sub" id="statTimeSub">0 días</div>
+        </div>
+        <div class="stub-item">
+          <div class="stub-label">Episodios vistos</div>
+          <div class="stub-value" id="statEpisodes">0</div>
+          <div class="stub-sub">en toda tu biblioteca</div>
+        </div>
+        <div class="stub-item">
+          <div class="stub-label">Pelis vistas</div>
+          <div class="stub-value" id="statMovies">0</div>
+          <div class="stub-sub" id="statMoviesSub">0 h de metraje</div>
+        </div>
+        <div class="stub-item">
+          <div class="stub-label">Ahora viendo</div>
+          <div class="stub-value" id="statWatching">0</div>
+          <div class="stub-sub">series activas</div>
+        </div>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -1110,7 +1126,11 @@ document.getElementById('importCsvInput').addEventListener('change', (e)=>{
 /* ---- library search & sort ---- */
 document.getElementById('librarySearch').addEventListener('input', (e)=>{
   librarySearch = e.target.value.trim().toLowerCase();
-  if(librarySearch && homeMode){ homeMode = false; currentFilter = 'all'; }
+  if(librarySearch){
+    if(homeMode){ homeMode = false; currentFilter = 'all'; }
+    weekViewActive = false;
+    exploreViewActive = false;
+  }
   resetPagination();
   renderLibrary();
 });
@@ -1121,7 +1141,11 @@ document.getElementById('sortSelect').addEventListener('change', async (e)=>{
 });
 document.getElementById('genreSelect').addEventListener('change', (e)=>{
   currentGenre = e.target.value;
-  if(currentGenre && homeMode){ homeMode = false; currentFilter = 'all'; }
+  if(currentGenre){
+    if(homeMode){ homeMode = false; currentFilter = 'all'; }
+    weekViewActive = false;
+    exploreViewActive = false;
+  }
   resetPagination();
   renderLibrary();
 });
@@ -1133,12 +1157,24 @@ document.getElementById('weekViewBtn').addEventListener('click', ()=>{
   renderLibrary();
 });
 
-/* ---- explore view toggle ---- */
-document.getElementById('exploreViewBtn').addEventListener('click', ()=>{
-  exploreViewActive = !exploreViewActive;
-  if(exploreViewActive) weekViewActive = false;
-  renderLibrary();
+/* ---- pestañas principales: Viendo / Todo / Explorar ---- */
+document.getElementById('topTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab');
+  if(!btn) return;
+  const target = btn.dataset.top;
+  weekViewActive = false;
+  if(target === 'explore'){
+    exploreViewActive = true;
+    renderLibrary();
+  } else if(target === 'all'){
+    exploreViewActive = false;
+    enterCategory('all');
+  } else {
+    exploreViewActive = false;
+    enterHome();
+  }
 });
+
 document.getElementById('exploreTypeTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.tab');
   if(!btn) return;
@@ -1311,6 +1347,8 @@ function enterHome(){
   currentFilter = 'all';
   librarySearch = '';
   currentGenre = '';
+  weekViewActive = false;
+  exploreViewActive = false;
   document.getElementById('librarySearch').value = '';
   resetPagination();
   renderLibrary();
@@ -1318,6 +1356,8 @@ function enterHome(){
 function enterCategory(categoryKey){
   homeMode = false;
   currentFilter = categoryKey;
+  weekViewActive = false;
+  exploreViewActive = false;
   resetPagination();
   renderLibrary();
 }
@@ -1392,14 +1432,20 @@ function renderLibrary(){
   const weekView = document.getElementById('weekView');
   const weekBtn = document.getElementById('weekViewBtn');
   const exploreView = document.getElementById('exploreView');
-  const exploreBtn = document.getElementById('exploreViewBtn');
   const newEpisodesShelf = document.getElementById('newEpisodesShelf');
   const homeShelves = document.getElementById('homeShelves');
   const headingRow = document.getElementById('sectionHeadingRow');
   const backHomeBtn = document.getElementById('backHomeBtn');
   const sectionTitle = document.getElementById('sectionHeadingTitle');
   weekBtn.classList.toggle('active', weekViewActive);
-  exploreBtn.classList.toggle('active', exploreViewActive);
+  document.querySelectorAll('#topTabs .tab').forEach(t=>{
+    const key = t.dataset.top;
+    let active = false;
+    if(key === 'explore') active = exploreViewActive;
+    else if(key === 'viendo') active = homeMode && !exploreViewActive;
+    else if(key === 'all') active = !homeMode && !exploreViewActive && currentFilter === 'all';
+    t.classList.toggle('active', active);
+  });
 
   if(exploreViewActive){
     grid.classList.add('hidden');
