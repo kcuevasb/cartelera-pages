@@ -158,6 +158,15 @@
   }
   .card:hover .remove-btn{opacity:1;}
   .remove-btn:hover{color:#fff;}
+  .favorite-btn{
+    position:absolute;bottom:6px;right:6px;width:24px;height:24px;border-radius:50%;
+    background:rgba(0,0,0,.55);border:none;color:rgba(255,255,255,.75);
+    font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity .12s, color .12s, transform .12s;z-index:2;
+  }
+  .card:hover .favorite-btn, .card:focus-within .favorite-btn{opacity:1;}
+  .favorite-btn:hover{color:#fff;transform:scale(1.1);}
+  .favorite-btn.active{opacity:1;color:var(--accent);}
   .progress-track{height:2px;background:rgba(255,255,255,.08);margin-top:8px;}
   .progress-fill{height:100%;background:var(--accent);}
   .card-info{padding:6px 0 0;flex:1;display:flex;flex-direction:column;gap:3px;}
@@ -352,6 +361,8 @@
   .explore-view{display:none;margin-top:20px;}
   .watched-view{display:none;margin-top:20px;}
   .watched-view.show{display:block;}
+  .favorites-view{display:none;margin-top:20px;}
+  .favorites-view.show{display:block;}
   .explore-view.show{display:block;}
   .explore-type-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:18px;}
   .explore-section{margin-bottom:26px;}
@@ -392,9 +403,15 @@
   .explore-load-more:hover{color:var(--text);border-color:var(--text-dim);}
 
   /* ---------- RATING STARS ---------- */
-  .rating-row{display:flex;align-items:center;gap:4px;margin:12px 0 4px;}
+  .rating-row{display:flex;align-items:center;gap:4px;margin:12px 0 4px;flex-wrap:wrap;}
   .star-btn{background:none;border:none;font-size:18px;color:var(--border-strong);padding:0;line-height:1;}
   .star-btn.filled{color:var(--accent);}
+  .detail-favorite-btn{
+    margin-left:10px;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
+    border-radius:20px;padding:5px 12px;font-size:12px;font-weight:500;
+  }
+  .detail-favorite-btn:hover{color:var(--text);border-color:var(--text-dim);}
+  .detail-favorite-btn.active{color:var(--accent);border-color:var(--accent);}
   .notes-field{margin-top:10px;}
   .notes-field textarea{
     width:100%;background:transparent;border:1px solid var(--border-strong);color:var(--text);
@@ -469,12 +486,14 @@
     /* el hover para revelar controles no existe al tocar: se quedan siempre visibles */
     .type-badge{opacity:1;}
     .remove-btn{opacity:1;background:rgba(0,0,0,.65);}
+    .favorite-btn{opacity:1;}
     .continue-card, .explore-card{cursor:default;}
 
     /* objetivos táctiles más grandes en controles pequeños */
     .icon-btn{padding:10px 12px;}
     .close-x{padding:10px;font-size:20px;}
     .remove-btn{width:26px;height:26px;}
+    .favorite-btn{width:28px;height:28px;font-size:16px;}
     .season-toggle{padding:8px;}
     .star-btn{font-size:22px;padding:6px;}
     .ep-row{padding:10px 0;}
@@ -572,6 +591,7 @@
     <button class="tab active" data-top="viendo">Viendo</button>
     <button class="tab" data-top="all">Todo</button>
     <button class="tab" data-top="watched">Visto</button>
+    <button class="tab" data-top="favorites">Favoritos</button>
     <button class="tab" data-top="explore">Explorar</button>
   </div>
 </header>
@@ -633,6 +653,11 @@
     </div>
     <div class="grid" id="watchedGrid"></div>
     <p class="help-text hidden" id="watchedEmpty">Aún no has marcado nada como visto en esta categoría.</p>
+  </div>
+
+  <div class="favorites-view" id="favoritesView">
+    <div class="grid" id="favoritesGrid"></div>
+    <p class="help-text hidden" id="favoritesEmpty">Aún no tienes nada marcado como favorito. Toca el corazón de cualquier tarjeta para añadirlo aquí.</p>
   </div>
 
   <div class="explore-view" id="exploreView">
@@ -782,15 +807,20 @@ let exploreMediaType = 'movie';
 let exploreDrill = null; // { mediaType, section } cuando estás viendo una sola sección a pantalla completa
 let watchedViewActive = false;
 let watchedMediaType = 'movie';
+let favoritesViewActive = false;
 const exploreCache = {};
 
+const RECOMMENDED_SECTION = { key:'recommended', label:'Recomendado para ti', custom:'recommended' };
+
 const MOVIE_EXPLORE_SECTIONS = [
+  RECOMMENDED_SECTION,
   { key:'now_playing', label:'Últimos estrenos', path:'/movie/now_playing' },
   { key:'upcoming', label:'Próximamente', path:'/movie/upcoming' },
   { key:'trending', label:'Tendencia esta semana', path:'/trending/movie/week' },
   { key:'classics', label:'Clásicos', path:'/discover/movie', extraParams:{ sort_by:'vote_average.desc', 'vote_count.gte':'2000', 'primary_release_date.lte':'2005-12-31' } }
 ];
 const TV_EXPLORE_SECTIONS = [
+  RECOMMENDED_SECTION,
   { key:'on_the_air', label:'Últimos estrenos', path:'/tv/on_the_air' },
   { key:'trending', label:'Tendencia esta semana', path:'/trending/tv/week' },
   { key:'top_rated', label:'Mejor valoradas', path:'/tv/top_rated' },
@@ -1027,6 +1057,7 @@ async function addItem(result, forcedStatus){
         last_watched_at: Date.now(),
         rating: 0,
         notes: '',
+        favorite: false,
         tmdb_status: d.status,
         episode_run_time: (d.episode_run_time && d.episode_run_time[0]) || 40,
         seasons: (d.seasons||[]).filter(s=>STATE.includeSpecials || s.season_number>0).map(s=>({
@@ -1060,6 +1091,7 @@ async function addItem(result, forcedStatus){
         last_watched_at: Date.now(),
         rating: 0,
         notes: '',
+        favorite: false,
         runtime: d.runtime || 0,
         release_date: d.release_date,
         watched_movie: forcedStatus === 'completed',
@@ -1281,7 +1313,7 @@ document.getElementById('weekViewBtn').addEventListener('click', ()=>{
   renderLibrary();
 });
 
-/* ---- pestañas principales: Viendo / Todo / Visto / Explorar ---- */
+/* ---- pestañas principales: Viendo / Todo / Visto / Favoritos / Explorar ---- */
 document.getElementById('topTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.tab');
   if(!btn) return;
@@ -1290,18 +1322,27 @@ document.getElementById('topTabs').addEventListener('click', (e)=>{
   if(target === 'explore'){
     exploreViewActive = true;
     watchedViewActive = false;
+    favoritesViewActive = false;
     renderLibrary();
   } else if(target === 'watched'){
     exploreViewActive = false;
     watchedViewActive = true;
+    favoritesViewActive = false;
+    renderLibrary();
+  } else if(target === 'favorites'){
+    exploreViewActive = false;
+    watchedViewActive = false;
+    favoritesViewActive = true;
     renderLibrary();
   } else if(target === 'all'){
     exploreViewActive = false;
     watchedViewActive = false;
+    favoritesViewActive = false;
     enterCategory('all');
   } else {
     exploreViewActive = false;
     watchedViewActive = false;
+    favoritesViewActive = false;
     enterHome();
   }
 });
@@ -1323,6 +1364,28 @@ document.getElementById('watchedTypeTabs').addEventListener('click', (e)=>{
   watchedMediaType = btn.dataset.watchedMedia;
   renderWatchedView();
 });
+
+function renderFavoritesView(){
+  const grid = document.getElementById('favoritesGrid');
+  const emptyMsg = document.getElementById('favoritesEmpty');
+  let items = STATE.library.filter(i => i.favorite);
+  if(currentGenre){
+    items = items.filter(i=> (i.genres||[]).includes(currentGenre));
+  }
+  if(librarySearch){
+    items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
+  }
+  items = sortItems(items);
+  grid.innerHTML = '';
+  if(!items.length){
+    emptyMsg.classList.remove('hidden');
+    grid.classList.add('hidden');
+    return;
+  }
+  emptyMsg.classList.add('hidden');
+  grid.classList.remove('hidden');
+  items.forEach(item=> grid.appendChild(buildCard(item)));
+}
 
 function renderWatchedView(){
   const grid = document.getElementById('watchedGrid');
@@ -1346,7 +1409,49 @@ function renderWatchedView(){
   items.forEach(item=> grid.appendChild(buildCard(item)));
 }
 
+/** Hasta 3 semillas para recomendaciones: primero favoritos, luego vistos, del tipo pedido. */
+function getRecommendationSeeds(mediaType){
+  const libItems = STATE.library.filter(i=>i.media_type===mediaType);
+  const favorites = libItems.filter(i=>i.favorite)
+    .sort((a,b)=>(b.added_at||0)-(a.added_at||0));
+  const watched = libItems.filter(i=>{
+    if(i.favorite) return false;
+    if(mediaType === 'movie') return i.watched_movie;
+    return i.watched && i.watched.length > 0;
+  }).sort((a,b)=>(b.last_watched_at||b.added_at||0)-(a.last_watched_at||a.added_at||0));
+  return [...favorites, ...watched].slice(0,3).map(i=>i.tmdb_id);
+}
+
+async function fetchRecommendedPage(mediaType, page){
+  const seeds = getRecommendationSeeds(mediaType);
+  if(!seeds.length) return { results: [], totalPages: 1 };
+  const responses = await Promise.all(seeds.map(seedId =>
+    tmdbFetch(`/${mediaType}/${seedId}/recommendations`, { page: String(page) }).catch(()=>({results:[]}))
+  ));
+  const seen = new Set();
+  const results = [];
+  responses.forEach(data=>{
+    (data.results||[]).forEach(r=>{
+      if(seen.has(r.id)) return;
+      seen.add(r.id);
+      results.push({
+        id: r.id,
+        media_type: mediaType,
+        title: mediaType === 'movie' ? r.title : r.name,
+        date: mediaType === 'movie' ? r.release_date : r.first_air_date,
+        poster_path: r.poster_path,
+        vote_average: r.vote_average
+      });
+    });
+  });
+  // no hay "total_pages" real al combinar varias fuentes: limitamos a un puñado de páginas razonable
+  return { results, totalPages: 3 };
+}
+
 async function fetchExplorePage(mediaType, section, page){
+  if(section.custom === 'recommended'){
+    return fetchRecommendedPage(mediaType, page);
+  }
   const params = Object.assign({ page: String(page) }, section.extraParams || {});
   const data = await tmdbFetch(section.path, params);
   const results = (data.results||[]).map(r=>({
@@ -1461,7 +1566,8 @@ async function renderExploreView(){
   }
   typeTabs.classList.remove('hidden');
 
-  const sections = exploreMediaType === 'movie' ? MOVIE_EXPLORE_SECTIONS : TV_EXPLORE_SECTIONS;
+  const allSections = exploreMediaType === 'movie' ? MOVIE_EXPLORE_SECTIONS : TV_EXPLORE_SECTIONS;
+  const sections = allSections.filter(s => s.custom !== 'recommended' || getRecommendationSeeds(exploreMediaType).length > 0);
   container.innerHTML = sections.map(s=>`
     <div class="explore-section">
       <button class="explore-label" data-drill-key="${s.key}">${escapeHtml(s.label)} <span class="explore-label-arrow">Ver todo →</span></button>
@@ -1612,6 +1718,13 @@ function nextUnwatchedEpisode(item){
   }
   return null;
 }
+async function toggleFavorite(item){
+  item.favorite = !item.favorite;
+  await saveLibrary();
+  renderLibrary();
+  showToast(item.favorite ? 'Añadida a favoritos' : 'Quitada de favoritos');
+}
+
 function markEpisode(item, season_number, episode_number, watched){
   const code = `S${season_number}E${episode_number}`;
   const idx = item.watched.indexOf(code);
@@ -1688,6 +1801,7 @@ function enterHome(){
   weekViewActive = false;
   exploreViewActive = false;
   watchedViewActive = false;
+  favoritesViewActive = false;
   exploreDrill = null;
   document.getElementById('librarySearch').value = '';
   resetPagination();
@@ -1699,6 +1813,7 @@ function enterCategory(categoryKey){
   weekViewActive = false;
   exploreViewActive = false;
   watchedViewActive = false;
+  favoritesViewActive = false;
   exploreDrill = null;
   resetPagination();
   renderLibrary();
@@ -1775,6 +1890,7 @@ function renderLibrary(){
   const weekBtn = document.getElementById('weekViewBtn');
   const exploreView = document.getElementById('exploreView');
   const watchedView = document.getElementById('watchedView');
+  const favoritesView = document.getElementById('favoritesView');
   const newEpisodesShelf = document.getElementById('newEpisodesShelf');
   const caughtUpShelf = document.getElementById('caughtUpShelf');
   const homeShelves = document.getElementById('homeShelves');
@@ -1787,8 +1903,9 @@ function renderLibrary(){
     let active = false;
     if(key === 'explore') active = exploreViewActive;
     else if(key === 'watched') active = watchedViewActive;
-    else if(key === 'viendo') active = homeMode && !exploreViewActive && !watchedViewActive;
-    else if(key === 'all') active = !homeMode && !exploreViewActive && !watchedViewActive && currentFilter === 'all';
+    else if(key === 'favorites') active = favoritesViewActive;
+    else if(key === 'viendo') active = homeMode && !exploreViewActive && !watchedViewActive && !favoritesViewActive;
+    else if(key === 'all') active = !homeMode && !exploreViewActive && !watchedViewActive && !favoritesViewActive && currentFilter === 'all';
     t.classList.toggle('active', active);
   });
 
@@ -1801,6 +1918,7 @@ function renderLibrary(){
     headingRow.classList.add('hidden');
     weekView.classList.remove('show');
     watchedView.classList.remove('show');
+    favoritesView.classList.remove('show');
     exploreView.classList.add('show');
     renderExploreView();
     return;
@@ -1815,11 +1933,26 @@ function renderLibrary(){
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
     weekView.classList.remove('show');
+    favoritesView.classList.remove('show');
     watchedView.classList.add('show');
     renderWatchedView();
     return;
   }
   watchedView.classList.remove('show');
+
+  if(favoritesViewActive){
+    grid.classList.add('hidden');
+    empty.classList.add('hidden');
+    newEpisodesShelf.classList.add('hidden');
+    caughtUpShelf.classList.add('hidden');
+    homeShelves.classList.add('hidden');
+    headingRow.classList.add('hidden');
+    weekView.classList.remove('show');
+    favoritesView.classList.add('show');
+    renderFavoritesView();
+    return;
+  }
+  favoritesView.classList.remove('show');
 
   if(weekViewActive){
     grid.classList.add('hidden');
@@ -2137,6 +2270,7 @@ function buildCard(item){
         <div class="type-badge ${item.media_type}">${item.media_type==='tv'?'Serie':'Peli'}</div>
         ${isFresh ? `<div class="new-badge">Nuevo</div>` : ''}
         <button class="remove-btn" title="Quitar" aria-label="Quitar de la biblioteca">✕</button>
+        <button class="favorite-btn ${item.favorite ? 'active' : ''}" title="${item.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}" aria-label="${item.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}" aria-pressed="${item.favorite ? 'true' : 'false'}">${item.favorite ? '♥' : '♡'}</button>
         ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="">` : `<div class="poster-placeholder">${escapeHtml(item.title)}</div>`}
       </div>
       <div class="progress-track"><div class="progress-fill" style="width:${progressPct}%"></div></div>
@@ -2158,6 +2292,11 @@ function buildCard(item){
     STATE.library = STATE.library.filter(i=>i.uid !== item.uid);
     await saveLibrary();
     renderLibrary();
+  });
+
+  card.querySelector('.favorite-btn').addEventListener('click', async (e)=>{
+    e.stopPropagation();
+    await toggleFavorite(item);
   });
 
   const nextBtn = card.querySelector('[data-action="next-ep"]');
@@ -2235,6 +2374,7 @@ function openDetail(uid){
     </div>
     <div class="rating-row" id="ratingRow">
       ${[1,2,3,4,5].map(n=>`<button class="star-btn ${ (item.rating||0) >= n ? 'filled' : '' }" data-star="${n}" aria-label="Valorar con ${n} estrella(s)">★</button>`).join('')}
+      <button class="detail-favorite-btn ${item.favorite?'active':''}" id="detailFavoriteBtn" aria-pressed="${item.favorite?'true':'false'}">${item.favorite ? '♥ En favoritos' : '♡ Añadir a favoritos'}</button>
     </div>
     <div class="notes-field">
       <textarea id="notesInput" placeholder="Notas personales (opinión, dónde lo dejaste, recomendaciones…)">${escapeHtml(item.notes||'')}</textarea>
@@ -2299,6 +2439,17 @@ function openDetail(uid){
       await saveLibrary();
       content.querySelectorAll('[data-star]').forEach(x=> x.classList.toggle('filled', Number(x.dataset.star) <= item.rating));
     });
+  });
+
+  // favorito
+  const favBtn = content.querySelector('#detailFavoriteBtn');
+  favBtn.addEventListener('click', async ()=>{
+    item.favorite = !item.favorite;
+    await saveLibrary();
+    favBtn.classList.toggle('active', item.favorite);
+    favBtn.setAttribute('aria-pressed', item.favorite ? 'true' : 'false');
+    favBtn.textContent = item.favorite ? '♥ En favoritos' : '♡ Añadir a favoritos';
+    renderLibrary();
   });
 
   // notes (debounced save)
