@@ -365,6 +365,12 @@
   }
   .explore-add-btn:hover{color:var(--text);border-color:var(--text-dim);}
   .explore-add-btn:disabled{opacity:.45;}
+  .explore-load-more{
+    display:flex;align-items:center;justify-content:center;
+    border:1px dashed var(--border-strong);border-radius:4px;cursor:pointer;
+    height:195px;color:var(--text-faint);font-size:12px;font-weight:500;text-align:center;
+  }
+  .explore-load-more:hover{color:var(--text);border-color:var(--text-dim);}
 
   @media (max-width: 640px){
     .explore-card{flex-basis:104px;}
@@ -514,6 +520,11 @@
   <div class="empty-state hidden" id="emptyState">
     <h3>Tu cartelera está vacía</h3>
     <p>Añade tu primera serie o película y Cartelera se encargará de avisarte de los episodios nuevos.</p>
+  </div>
+
+  <div class="continue-section hidden" id="caughtUpShelf">
+    <div class="continue-label">Estás al día</div>
+    <div class="continue-row" id="caughtUpRow"></div>
   </div>
 
   <div class="home-shelves" id="homeShelves"></div>
@@ -1185,11 +1196,10 @@ document.getElementById('exploreTypeTabs').addEventListener('click', (e)=>{
   renderExploreView();
 });
 
-async function fetchExploreSection(mediaType, section){
-  const cacheKey = `${mediaType}:${section.key}`;
-  if(exploreCache[cacheKey]) return exploreCache[cacheKey];
-  const data = await tmdbFetch(section.path, section.extraParams || {});
-  const results = (data.results||[]).slice(0,12).map(r=>({
+async function fetchExplorePage(mediaType, section, page){
+  const params = Object.assign({ page: String(page) }, section.extraParams || {});
+  const data = await tmdbFetch(section.path, params);
+  const results = (data.results||[]).map(r=>({
     id: r.id,
     media_type: mediaType,
     title: mediaType === 'movie' ? r.title : r.name,
@@ -1197,8 +1207,49 @@ async function fetchExploreSection(mediaType, section){
     poster_path: r.poster_path,
     vote_average: r.vote_average
   }));
-  exploreCache[cacheKey] = results;
-  return results;
+  return { results, totalPages: data.total_pages || 1 };
+}
+
+/** Carga páginas hasta tener un puñado de resultados visibles (que no tengas ya) o agotar TMDB. */
+async function ensureExploreSection(mediaType, section){
+  const cacheKey = `${mediaType}:${section.key}`;
+  if(!exploreCache[cacheKey]){
+    exploreCache[cacheKey] = { rawItems: [], page: 0, totalPages: 1, mediaType, section };
+  }
+  const cache = exploreCache[cacheKey];
+  const TARGET_VISIBLE = 10;
+  const MAX_PAGES = 5;
+  while(cache.page < cache.totalPages && cache.page < MAX_PAGES){
+    const visibleCount = cache.rawItems.filter(it => !STATE.library.some(li=>li.tmdb_id===it.id && li.media_type===it.media_type)).length;
+    if(cache.page > 0 && visibleCount >= TARGET_VISIBLE) break;
+    const nextPage = cache.page + 1;
+    const { results, totalPages } = await fetchExplorePage(mediaType, section, nextPage);
+    cache.rawItems.push(...results);
+    cache.page = nextPage;
+    cache.totalPages = totalPages;
+    if(!results.length) break;
+  }
+  return cache;
+}
+
+async function loadMoreExploreRow(cacheKey){
+  const cache = exploreCache[cacheKey];
+  if(!cache) return;
+  if(cache.page >= cache.totalPages){
+    showToast('No hay más resultados en esta sección por ahora.');
+    renderExploreRow(cacheKey);
+    return;
+  }
+  try{
+    const nextPage = cache.page + 1;
+    const { results, totalPages } = await fetchExplorePage(cache.mediaType, cache.section, nextPage);
+    cache.rawItems.push(...results);
+    cache.page = nextPage;
+    cache.totalPages = totalPages;
+  }catch(err){
+    showToast('No se pudo cargar más contenido ahora mismo.');
+  }
+  renderExploreRow(cacheKey);
 }
 
 async function renderExploreView(){
@@ -1215,22 +1266,31 @@ async function renderExploreView(){
     </div>
   `).join('');
   for(const s of sections){
-    const row = document.getElementById(`explore-row-${s.key}`);
+    const cacheKey = `${exploreMediaType}:${s.key}`;
     try{
-      const items = await fetchExploreSection(exploreMediaType, s);
-      renderExploreRow(s.key, items);
+      await ensureExploreSection(exploreMediaType, s);
+      renderExploreRow(cacheKey);
     }catch(err){
       console.error('Error cargando sección de Explorar', s.key, err);
+      const row = document.getElementById(`explore-row-${s.key}`);
       if(row) row.innerHTML = `<p class="help-text">No se pudo cargar esta sección. Revisa tu clave de API.</p>`;
     }
   }
 }
 
-function renderExploreRow(sectionKey, items){
-  const row = document.getElementById(`explore-row-${sectionKey}`);
+function renderExploreRow(cacheKey){
+  const cache = exploreCache[cacheKey];
+  if(!cache) return;
+  const row = document.getElementById(`explore-row-${cache.section.key}`);
   if(!row) return;
-  const visible = items.filter(it => !STATE.library.some(li => li.tmdb_id === it.id && li.media_type === it.media_type));
-  if(!visible.length){ row.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`; return; }
+  const visible = cache.rawItems.filter(it => !STATE.library.some(li => li.tmdb_id === it.id && li.media_type === it.media_type));
+  const hasMore = cache.page < cache.totalPages;
+
+  if(!visible.length && !hasMore){
+    row.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`;
+    return;
+  }
+
   row.innerHTML = visible.map(it=>{
     const year = it.date ? it.date.slice(0,4) : 's/f';
     return `
@@ -1241,19 +1301,29 @@ function renderExploreRow(sectionKey, items){
         <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}">Añadir</button>
       </div>
     `;
-  }).join('');
+  }).join('') + (hasMore ? `
+    <div class="explore-card explore-load-more" data-load-more="${cacheKey}" tabindex="0" role="button" aria-label="Cargar más resultados">
+      <div class="explore-load-more-inner">Cargar más →</div>
+    </div>
+  ` : '');
+
   row.querySelectorAll('[data-explore-id]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       btn.disabled = true;
       btn.textContent = 'Añadiendo…';
       await addItem({ id: Number(btn.dataset.exploreId), media_type: btn.dataset.exploreType });
-      const card = btn.closest('.explore-card');
-      if(card) card.remove();
-      if(!row.querySelector('.explore-card')){
-        row.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`;
-      }
+      renderExploreRow(cacheKey);
     });
   });
+  const loadMoreEl = row.querySelector('[data-load-more]');
+  if(loadMoreEl){
+    const trigger = async ()=>{
+      loadMoreEl.querySelector('.explore-load-more-inner').textContent = 'Cargando…';
+      await loadMoreExploreRow(cacheKey);
+    };
+    loadMoreEl.addEventListener('click', trigger);
+    loadMoreEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); trigger(); } });
+  }
 }
 
 /* ============ TV LOGIC: progress / next unseen episode ============ */
@@ -1438,6 +1508,7 @@ function renderLibrary(){
   const weekBtn = document.getElementById('weekViewBtn');
   const exploreView = document.getElementById('exploreView');
   const newEpisodesShelf = document.getElementById('newEpisodesShelf');
+  const caughtUpShelf = document.getElementById('caughtUpShelf');
   const homeShelves = document.getElementById('homeShelves');
   const headingRow = document.getElementById('sectionHeadingRow');
   const backHomeBtn = document.getElementById('backHomeBtn');
@@ -1456,6 +1527,7 @@ function renderLibrary(){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
     newEpisodesShelf.classList.add('hidden');
+    caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
     weekView.classList.remove('show');
@@ -1469,6 +1541,7 @@ function renderLibrary(){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
     newEpisodesShelf.classList.add('hidden');
+    caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
     weekView.classList.add('show');
@@ -1481,18 +1554,27 @@ function renderLibrary(){
   grid.classList.toggle('list-mode', STATE.viewMode === 'list');
 
   let items, emptyMsg;
+  let watchingTotalCount = 0;
   if(homeMode){
     backHomeBtn.classList.add('hidden');
     sectionTitle.textContent = 'Viendo';
     renderNewEpisodesShelf();
     homeShelves.classList.remove('hidden');
     renderHomeShelves();
-    items = sortItems(STATE.library.filter(i=>i.status==='watching'));
+
+    const watchingItems = STATE.library.filter(i=>i.status==='watching');
+    watchingTotalCount = watchingItems.length;
+    const actionable = sortItems(watchingItems.filter(isWatchingActionable));
+    const caughtUp = watchingItems.filter(i=>!isWatchingActionable(i));
+    renderCaughtUpShelf(caughtUp);
+
+    items = actionable;
     emptyMsg = 'No tienes ninguna serie o película en "Viendo" ahora mismo. Añade algo o mira las estanterías de abajo.';
   } else {
     backHomeBtn.classList.remove('hidden');
     sectionTitle.textContent = categoryLabel(currentFilter);
     newEpisodesShelf.classList.add('hidden');
+    caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     items = filteredLibrary();
     emptyMsg = 'Nada por aquí. Prueba otra búsqueda o género.';
@@ -1505,11 +1587,19 @@ function renderLibrary(){
     return;
   }
   empty.classList.add('hidden');
-  grid.classList.remove('hidden');
+
   if(!items.length){
+    if(homeMode && watchingTotalCount > 0){
+      // hay series en Viendo, pero ninguna con algo accionable ahora mismo:
+      // la fila "Estás al día" ya lo comunica, así que no repetimos aviso aquí.
+      grid.classList.add('hidden');
+      return;
+    }
+    grid.classList.remove('hidden');
     grid.innerHTML = `<p class="help-text" style="grid-column:1/-1;">${emptyMsg}</p>`;
     return;
   }
+  grid.classList.remove('hidden');
   const visible = items.slice(0, renderedCount);
   visible.forEach(item=> grid.appendChild(buildCard(item)));
 
@@ -1525,11 +1615,40 @@ function renderLibrary(){
   }
 }
 
+/** ¿Hay algo que esta serie/peli permita ver ahora mismo? */
+function isWatchingActionable(item){
+  if(item.media_type === 'movie') return !item.watched_movie;
+  const next = nextUnwatchedEpisode(item);
+  if(!next) return false;
+  return isEpisodeAired(item, next.season_number, next.episode_number);
+}
+
 function wireShelfCardOpenHandlers(row){
   row.querySelectorAll('[data-open]').forEach(el=>{
     el.addEventListener('click', ()=> openDetail(el.dataset.open));
     el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(el.dataset.open); } });
   });
+}
+
+/* ---- estás al día ---- */
+function renderCaughtUpShelf(items){
+  const container = document.getElementById('caughtUpShelf');
+  const row = document.getElementById('caughtUpRow');
+  if(!items.length){ container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  row.innerHTML = items.map(item=>{
+    const meta = item.media_type === 'movie'
+      ? (item.runtime ? `${item.runtime} min` : 'Vista')
+      : `${item.watched.length}/${totalEpisodeCount(item)} episodios`;
+    return `
+      <div class="continue-card" data-open="${item.uid}" tabindex="0" role="button" aria-label="Abrir ${escapeHtml(item.title)}">
+        ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="">` : `<div style="width:110px;height:165px;background:#0d0d0d;border-radius:3px;"></div>`}
+        <div class="cc-title">${escapeHtml(item.title)}</div>
+        <div class="cc-meta">${meta}</div>
+      </div>
+    `;
+  }).join('');
+  wireShelfCardOpenHandlers(row);
 }
 
 /* ---- episodios nuevos ---- */
