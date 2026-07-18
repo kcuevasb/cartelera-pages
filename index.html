@@ -363,6 +363,7 @@
   .watched-view.show{display:block;}
   .favorites-view{display:none;margin-top:20px;}
   .favorites-view.show{display:block;}
+  .favorites-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;}
   .explore-view.show{display:block;}
   .explore-type-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:18px;}
   .explore-section{margin-bottom:26px;}
@@ -388,6 +389,7 @@
   .explore-card img{width:130px;height:195px;object-fit:cover;border-radius:3px;display:block;background:#0d0d0d;filter:saturate(.92);}
   .explore-card .ec-title{font-size:12px;font-weight:600;margin-top:7px;line-height:1.3;}
   .explore-card .ec-meta{font-size:10.5px;color:var(--text-faint);font-family:var(--font-mono);margin-top:2px;}
+  .explore-card .ec-because{font-size:10px;color:var(--accent);margin-top:4px;line-height:1.3;font-style:italic;}
   .explore-actions{display:flex;gap:6px;margin-top:7px;}
   .explore-add-btn{
     flex:1;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
@@ -656,6 +658,14 @@
   </div>
 
   <div class="favorites-view" id="favoritesView">
+    <div class="favorites-toolbar">
+      <select class="genre-select" id="favoritesRatingFilter">
+        <option value="0">Todas las valoraciones</option>
+        <option value="4">4-5 estrellas</option>
+        <option value="5">Solo 5 estrellas</option>
+      </select>
+      <button class="view-toggle" id="shareFavoritesBtn">Compartir favoritos</button>
+    </div>
     <div class="grid" id="favoritesGrid"></div>
     <p class="help-text hidden" id="favoritesEmpty">Aún no tienes nada marcado como favorito. Toca el corazón de cualquier tarjeta para añadirlo aquí.</p>
   </div>
@@ -701,6 +711,11 @@
           <div class="stub-label">Ahora viendo</div>
           <div class="stub-value" id="statWatching">0</div>
           <div class="stub-sub">series activas</div>
+        </div>
+        <div class="stub-item">
+          <div class="stub-label">Favoritos</div>
+          <div class="stub-value" id="statFavorites">0</div>
+          <div class="stub-sub" id="statFavoritesSub">—</div>
         </div>
       </div>
     </div>
@@ -1365,10 +1380,43 @@ document.getElementById('watchedTypeTabs').addEventListener('click', (e)=>{
   renderWatchedView();
 });
 
+let favoritesMinRating = 0;
+document.getElementById('favoritesRatingFilter').addEventListener('change', (e)=>{
+  favoritesMinRating = Number(e.target.value);
+  renderFavoritesView();
+});
+
+async function shareFavorites(){
+  const items = sortItems(STATE.library.filter(i=>i.favorite));
+  if(!items.length){ showToast('Aún no tienes favoritos que compartir.'); return; }
+  const lines = items.map(i=>{
+    let year = '';
+    if(i.media_type === 'movie' && i.release_date) year = i.release_date.slice(0,4);
+    if(i.media_type === 'tv' && i.seasons && i.seasons[0] && i.seasons[0].air_date) year = i.seasons[0].air_date.slice(0,4);
+    return `• ${i.title}${year ? ' ('+year+')' : ''}`;
+  });
+  const text = `Mis favoritos en Cartelera 🎬\n\n${lines.join('\n')}`;
+  if(navigator.share){
+    try{ await navigator.share({ text, title: 'Mis favoritos' }); }
+    catch(e){ /* el usuario canceló el share, no pasa nada */ }
+    return;
+  }
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('Lista de favoritos copiada al portapapeles');
+  }catch(e){
+    showToast('No se pudo compartir ni copiar la lista automáticamente.');
+  }
+}
+document.getElementById('shareFavoritesBtn').addEventListener('click', shareFavorites);
+
 function renderFavoritesView(){
   const grid = document.getElementById('favoritesGrid');
   const emptyMsg = document.getElementById('favoritesEmpty');
   let items = STATE.library.filter(i => i.favorite);
+  if(favoritesMinRating > 0){
+    items = items.filter(i => (i.rating||0) >= favoritesMinRating);
+  }
   if(currentGenre){
     items = items.filter(i=> (i.genres||[]).includes(currentGenre));
   }
@@ -1378,6 +1426,10 @@ function renderFavoritesView(){
   items = sortItems(items);
   grid.innerHTML = '';
   if(!items.length){
+    const hasAnyFavorite = STATE.library.some(i=>i.favorite);
+    emptyMsg.textContent = hasAnyFavorite
+      ? 'Ningún favorito coincide con este filtro.'
+      : 'Aún no tienes nada marcado como favorito. Toca el corazón de cualquier tarjeta para añadirlo aquí.';
     emptyMsg.classList.remove('hidden');
     grid.classList.add('hidden');
     return;
@@ -1419,18 +1471,20 @@ function getRecommendationSeeds(mediaType){
     if(mediaType === 'movie') return i.watched_movie;
     return i.watched && i.watched.length > 0;
   }).sort((a,b)=>(b.last_watched_at||b.added_at||0)-(a.last_watched_at||a.added_at||0));
-  return [...favorites, ...watched].slice(0,3).map(i=>i.tmdb_id);
+  return [...favorites, ...watched].slice(0,3).map(i=>({ id: i.tmdb_id, title: i.title }));
 }
 
 async function fetchRecommendedPage(mediaType, page){
   const seeds = getRecommendationSeeds(mediaType);
   if(!seeds.length) return { results: [], totalPages: 1 };
-  const responses = await Promise.all(seeds.map(seedId =>
-    tmdbFetch(`/${mediaType}/${seedId}/recommendations`, { page: String(page) }).catch(()=>({results:[]}))
+  const responses = await Promise.all(seeds.map(seed =>
+    tmdbFetch(`/${mediaType}/${seed.id}/recommendations`, { page: String(page) })
+      .then(data => ({ seed, data }))
+      .catch(()=>({ seed, data: { results: [] } }))
   ));
   const seen = new Set();
   const results = [];
-  responses.forEach(data=>{
+  responses.forEach(({seed, data})=>{
     (data.results||[]).forEach(r=>{
       if(seen.has(r.id)) return;
       seen.add(r.id);
@@ -1440,7 +1494,8 @@ async function fetchRecommendedPage(mediaType, page){
         title: mediaType === 'movie' ? r.title : r.name,
         date: mediaType === 'movie' ? r.release_date : r.first_air_date,
         poster_path: r.poster_path,
-        vote_average: r.vote_average
+        vote_average: r.vote_average,
+        becauseOf: seed.title
       });
     });
   });
@@ -1448,9 +1503,29 @@ async function fetchRecommendedPage(mediaType, page){
   return { results, totalPages: 3 };
 }
 
+async function fetchSimilarPage(mediaType, section, page){
+  try{
+    const data = await tmdbFetch(`/${mediaType}/${section.seedId}/recommendations`, { page: String(page) });
+    const results = (data.results||[]).map(r=>({
+      id: r.id,
+      media_type: mediaType,
+      title: mediaType === 'movie' ? r.title : r.name,
+      date: mediaType === 'movie' ? r.release_date : r.first_air_date,
+      poster_path: r.poster_path,
+      vote_average: r.vote_average
+    }));
+    return { results, totalPages: data.total_pages || 1 };
+  }catch(err){
+    return { results: [], totalPages: 1 };
+  }
+}
+
 async function fetchExplorePage(mediaType, section, page){
   if(section.custom === 'recommended'){
     return fetchRecommendedPage(mediaType, page);
+  }
+  if(section.custom === 'similar'){
+    return fetchSimilarPage(mediaType, section, page);
   }
   const params = Object.assign({ page: String(page) }, section.extraParams || {});
   const data = await tmdbFetch(section.path, params);
@@ -1516,6 +1591,7 @@ function buildExploreCardEl(it){
     ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:100%;aspect-ratio:2/3;background:#0d0d0d;border-radius:3px;"></div>`}
     <div class="ec-title">${escapeHtml(it.title||'')}</div>
     <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
+    ${it.becauseOf ? `<div class="ec-because">Porque viste ${escapeHtml(it.becauseOf)}</div>` : ''}
     <div class="explore-actions">
       <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="watchlist">Añadir</button>
       <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>
@@ -1761,6 +1837,8 @@ function hasFreshUnwatchedEpisode(item){
 /* ============ STATS ============ */
 function computeStats(){
   let totalMinutes = 0, episodesWatched = 0, moviesWatched = 0, movieMinutes = 0, watchingCount = 0;
+  const genreCounts = {};
+  let favoritesCount = 0;
   STATE.library.forEach(item=>{
     if(item.media_type === 'tv'){
       const watchedCount = item.watched.length;
@@ -1774,6 +1852,10 @@ function computeStats(){
         totalMinutes += item.runtime || 0;
       }
     }
+    if(item.favorite){
+      favoritesCount++;
+      (item.genres||[]).forEach(g=>{ genreCounts[g] = (genreCounts[g]||0) + 1; });
+    }
   });
   const totalHours = Math.round(totalMinutes/60);
   const totalDays = (totalMinutes/60/24).toFixed(1);
@@ -1783,6 +1865,15 @@ function computeStats(){
   document.getElementById('statMovies').textContent = moviesWatched;
   document.getElementById('statMoviesSub').textContent = Math.round(movieMinutes/60) + ' h de metraje';
   document.getElementById('statWatching').textContent = watchingCount;
+
+  document.getElementById('statFavorites').textContent = favoritesCount;
+  let topGenre = '—';
+  const genreEntries = Object.entries(genreCounts);
+  if(genreEntries.length){
+    genreEntries.sort((a,b)=>b[1]-a[1]);
+    topGenre = `${genreEntries[0][0]} es tu género favorito`;
+  }
+  document.getElementById('statFavoritesSub').textContent = favoritesCount ? topGenre : 'sin favoritos aún';
 }
 
 /* ============ RENDER LIBRARY ============ */
@@ -2375,6 +2466,7 @@ function openDetail(uid){
     <div class="rating-row" id="ratingRow">
       ${[1,2,3,4,5].map(n=>`<button class="star-btn ${ (item.rating||0) >= n ? 'filled' : '' }" data-star="${n}" aria-label="Valorar con ${n} estrella(s)">★</button>`).join('')}
       <button class="detail-favorite-btn ${item.favorite?'active':''}" id="detailFavoriteBtn" aria-pressed="${item.favorite?'true':'false'}">${item.favorite ? '♥ En favoritos' : '♡ Añadir a favoritos'}</button>
+      <button class="detail-favorite-btn" id="detailSimilarBtn">🔍 Similar a esto</button>
     </div>
     <div class="notes-field">
       <textarea id="notesInput" placeholder="Notas personales (opinión, dónde lo dejaste, recomendaciones…)">${escapeHtml(item.notes||'')}</textarea>
@@ -2449,6 +2541,28 @@ function openDetail(uid){
     favBtn.classList.toggle('active', item.favorite);
     favBtn.setAttribute('aria-pressed', item.favorite ? 'true' : 'false');
     favBtn.textContent = item.favorite ? '♥ En favoritos' : '♡ Añadir a favoritos';
+    renderLibrary();
+  });
+
+  // similar a esto: abre Explorar directamente en una pantalla de sección
+  // dedicada, recomendada solo a partir de este título
+  content.querySelector('#detailSimilarBtn').addEventListener('click', ()=>{
+    const section = {
+      key: `similar-${item.tmdb_id}`,
+      label: `Similar a "${item.title}"`,
+      custom: 'similar',
+      seedId: item.tmdb_id
+    };
+    closeModal('detailOverlay');
+    exploreMediaType = item.media_type;
+    document.querySelectorAll('#exploreTypeTabs .tab').forEach(t=>{
+      t.classList.toggle('active', t.dataset.media === item.media_type);
+    });
+    weekViewActive = false;
+    watchedViewActive = false;
+    favoritesViewActive = false;
+    exploreViewActive = true;
+    exploreDrill = { mediaType: item.media_type, section };
     renderLibrary();
   });
 
@@ -2572,6 +2686,7 @@ function openDetail(uid){
 async function syncItem(item){
   try{
     if(item.media_type === 'tv'){
+      const wasEnded = item.tmdb_status === 'Ended' || item.tmdb_status === 'Canceled';
       const d = await fetchTvDetails(item.tmdb_id);
       item.tmdb_status = d.status;
       item.episode_run_time = (d.episode_run_time && d.episode_run_time[0]) || item.episode_run_time;
@@ -2584,12 +2699,16 @@ async function syncItem(item){
         name: d.next_episode_to_air.name,
         air_date: d.next_episode_to_air.air_date
       } : null;
+      const revivedNow = wasEnded && (d.status === 'Returning Series' || d.status === 'In Production' || d.status === 'Planned');
+      if(revivedNow && item.favorite){
+        return { ok: true, revived: item.title };
+      }
     }
     item.last_synced = Date.now();
-    return true;
+    return { ok: true, revived: null };
   }catch(err){
     console.error('Error sincronizando', item.title, err);
-    return false;
+    return { ok: false, revived: null };
   }
 }
 
@@ -2603,16 +2722,25 @@ async function syncAll(showFeedback){
   if(showFeedback) showToast('Sincronizando con TMDB…');
   document.getElementById('syncBtn').style.opacity = '.5';
   let ok = 0;
+  const revived = [];
   for(const item of tvItems){
-    const success = await syncItem(item);
-    if(success) ok++;
+    const result = await syncItem(item);
+    if(result.ok) ok++;
+    if(result.revived) revived.push(result.revived);
+    item.last_synced = Date.now();
     await new Promise(r=>setTimeout(r, 120)); // suave, evita rate limit
   }
   document.getElementById('syncBtn').style.opacity = '1';
   await saveLibrary();
   renderLibrary();
   updateSyncNote();
-  if(showFeedback) showToast(`Sincronizado: ${ok}/${tvItems.length} series actualizadas`);
+  if(revived.length){
+    showToast(revived.length === 1
+      ? `¡${revived[0]} ha vuelto! Tenías esta favorita marcada como terminada.`
+      : `¡Han vuelto ${revived.length} de tus favoritas terminadas: ${revived.join(', ')}!`);
+  } else if(showFeedback){
+    showToast(`Sincronizado: ${ok}/${tvItems.length} series actualizadas`);
+  }
 }
 
 function updateSyncNote(){
