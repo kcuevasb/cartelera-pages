@@ -350,6 +350,8 @@
 
   /* ---------- EXPLORAR ---------- */
   .explore-view{display:none;margin-top:20px;}
+  .watched-view{display:none;margin-top:20px;}
+  .watched-view.show{display:block;}
   .explore-view.show{display:block;}
   .explore-type-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:18px;}
   .explore-section{margin-bottom:26px;}
@@ -359,8 +361,9 @@
   .explore-card img{width:130px;height:195px;object-fit:cover;border-radius:3px;display:block;background:#0d0d0d;filter:saturate(.92);}
   .explore-card .ec-title{font-size:12px;font-weight:600;margin-top:7px;line-height:1.3;}
   .explore-card .ec-meta{font-size:10.5px;color:var(--text-faint);font-family:var(--font-mono);margin-top:2px;}
+  .explore-actions{display:flex;gap:6px;margin-top:7px;}
   .explore-add-btn{
-    margin-top:7px;width:100%;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
+    flex:1;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
     border-radius:5px;padding:6px 0;font-size:11px;font-weight:500;
   }
   .explore-add-btn:hover{color:var(--text);border-color:var(--text-dim);}
@@ -477,7 +480,8 @@
   <div class="top-tabs" id="topTabs">
     <button class="tab active" data-top="viendo">Viendo</button>
     <button class="tab" data-top="all">Todo</button>
-    <button class="tab" data-top="explore">🔍 Explorar</button>
+    <button class="tab" data-top="watched">Visto</button>
+    <button class="tab" data-top="explore">Explorar</button>
   </div>
 </header>
 
@@ -530,6 +534,15 @@
   <div class="home-shelves" id="homeShelves"></div>
 
   <div class="week-view" id="weekView"></div>
+
+  <div class="watched-view" id="watchedView">
+    <div class="explore-type-tabs" id="watchedTypeTabs">
+      <button class="tab active" data-watched-media="movie">Películas</button>
+      <button class="tab" data-watched-media="tv">Series</button>
+    </div>
+    <div class="grid" id="watchedGrid"></div>
+    <p class="help-text hidden" id="watchedEmpty">Aún no has marcado nada como visto en esta categoría.</p>
+  </div>
 
   <div class="explore-view" id="exploreView">
     <div class="explore-type-tabs" id="exploreTypeTabs">
@@ -675,6 +688,8 @@ let librarySearch = '';
 let weekViewActive = false;
 let exploreViewActive = false;
 let exploreMediaType = 'movie';
+let watchedViewActive = false;
+let watchedMediaType = 'movie';
 const exploreCache = {};
 
 const MOVIE_EXPLORE_SECTIONS = [
@@ -934,6 +949,11 @@ async function addItem(result, forcedStatus){
         } : null,
         last_synced: Date.now()
       };
+      if(forcedStatus === 'completed'){
+        item.watched = item.seasons.flatMap(s =>
+          Array.from({length: s.episode_count}, (_, i) => `S${s.season_number}E${i+1}`)
+        );
+      }
       STATE.library.unshift(item);
     } else {
       const d = await fetchMovieDetails(result.id);
@@ -958,7 +978,7 @@ async function addItem(result, forcedStatus){
     }
     await saveLibrary();
     renderLibrary();
-    showToast('Añadido a tu cartelera');
+    showToast(forcedStatus === 'completed' ? 'Añadida como vista' : 'Añadido a tu cartelera');
   }catch(err){
     console.error(err);
     showToast('No se pudo añadir. Revisa tu clave de API.');
@@ -1169,7 +1189,7 @@ document.getElementById('weekViewBtn').addEventListener('click', ()=>{
   renderLibrary();
 });
 
-/* ---- pestañas principales: Viendo / Todo / Explorar ---- */
+/* ---- pestañas principales: Viendo / Todo / Visto / Explorar ---- */
 document.getElementById('topTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.tab');
   if(!btn) return;
@@ -1177,12 +1197,19 @@ document.getElementById('topTabs').addEventListener('click', (e)=>{
   weekViewActive = false;
   if(target === 'explore'){
     exploreViewActive = true;
+    watchedViewActive = false;
+    renderLibrary();
+  } else if(target === 'watched'){
+    exploreViewActive = false;
+    watchedViewActive = true;
     renderLibrary();
   } else if(target === 'all'){
     exploreViewActive = false;
+    watchedViewActive = false;
     enterCategory('all');
   } else {
     exploreViewActive = false;
+    watchedViewActive = false;
     enterHome();
   }
 });
@@ -1195,6 +1222,37 @@ document.getElementById('exploreTypeTabs').addEventListener('click', (e)=>{
   exploreMediaType = btn.dataset.media;
   renderExploreView();
 });
+
+document.getElementById('watchedTypeTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab');
+  if(!btn) return;
+  document.querySelectorAll('#watchedTypeTabs .tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  watchedMediaType = btn.dataset.watchedMedia;
+  renderWatchedView();
+});
+
+function renderWatchedView(){
+  const grid = document.getElementById('watchedGrid');
+  const emptyMsg = document.getElementById('watchedEmpty');
+  let items = STATE.library.filter(i => i.status === 'completed' && i.media_type === watchedMediaType);
+  if(currentGenre){
+    items = items.filter(i=> (i.genres||[]).includes(currentGenre));
+  }
+  if(librarySearch){
+    items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
+  }
+  items = sortItems(items);
+  grid.innerHTML = '';
+  if(!items.length){
+    emptyMsg.classList.remove('hidden');
+    grid.classList.add('hidden');
+    return;
+  }
+  emptyMsg.classList.add('hidden');
+  grid.classList.remove('hidden');
+  items.forEach(item=> grid.appendChild(buildCard(item)));
+}
 
 async function fetchExplorePage(mediaType, section, page){
   const params = Object.assign({ page: String(page) }, section.extraParams || {});
@@ -1298,7 +1356,10 @@ function renderExploreRow(cacheKey){
         ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:130px;height:195px;background:#0d0d0d;border-radius:3px;"></div>`}
         <div class="ec-title">${escapeHtml(it.title||'')}</div>
         <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
-        <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}">Añadir</button>
+        <div class="explore-actions">
+          <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="watchlist">Añadir</button>
+          <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>
+        </div>
       </div>
     `;
   }).join('') + (hasMore ? `
@@ -1309,9 +1370,11 @@ function renderExploreRow(cacheKey){
 
   row.querySelectorAll('[data-explore-id]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      btn.disabled = true;
-      btn.textContent = 'Añadiendo…';
-      await addItem({ id: Number(btn.dataset.exploreId), media_type: btn.dataset.exploreType });
+      const id = btn.dataset.exploreId;
+      const status = btn.dataset.exploreStatus || 'watchlist';
+      row.querySelectorAll(`[data-explore-id="${id}"]`).forEach(b=>{ b.disabled = true; });
+      btn.textContent = status === 'completed' ? 'Marcando…' : 'Añadiendo…';
+      await addItem({ id: Number(id), media_type: btn.dataset.exploreType }, status);
       renderExploreRow(cacheKey);
     });
   });
@@ -1424,6 +1487,7 @@ function enterHome(){
   currentGenre = '';
   weekViewActive = false;
   exploreViewActive = false;
+  watchedViewActive = false;
   document.getElementById('librarySearch').value = '';
   resetPagination();
   renderLibrary();
@@ -1433,6 +1497,7 @@ function enterCategory(categoryKey){
   currentFilter = categoryKey;
   weekViewActive = false;
   exploreViewActive = false;
+  watchedViewActive = false;
   resetPagination();
   renderLibrary();
 }
@@ -1507,6 +1572,7 @@ function renderLibrary(){
   const weekView = document.getElementById('weekView');
   const weekBtn = document.getElementById('weekViewBtn');
   const exploreView = document.getElementById('exploreView');
+  const watchedView = document.getElementById('watchedView');
   const newEpisodesShelf = document.getElementById('newEpisodesShelf');
   const caughtUpShelf = document.getElementById('caughtUpShelf');
   const homeShelves = document.getElementById('homeShelves');
@@ -1518,8 +1584,9 @@ function renderLibrary(){
     const key = t.dataset.top;
     let active = false;
     if(key === 'explore') active = exploreViewActive;
-    else if(key === 'viendo') active = homeMode && !exploreViewActive;
-    else if(key === 'all') active = !homeMode && !exploreViewActive && currentFilter === 'all';
+    else if(key === 'watched') active = watchedViewActive;
+    else if(key === 'viendo') active = homeMode && !exploreViewActive && !watchedViewActive;
+    else if(key === 'all') active = !homeMode && !exploreViewActive && !watchedViewActive && currentFilter === 'all';
     t.classList.toggle('active', active);
   });
 
@@ -1531,11 +1598,26 @@ function renderLibrary(){
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
     weekView.classList.remove('show');
+    watchedView.classList.remove('show');
     exploreView.classList.add('show');
     renderExploreView();
     return;
   }
   exploreView.classList.remove('show');
+
+  if(watchedViewActive){
+    grid.classList.add('hidden');
+    empty.classList.add('hidden');
+    newEpisodesShelf.classList.add('hidden');
+    caughtUpShelf.classList.add('hidden');
+    homeShelves.classList.add('hidden');
+    headingRow.classList.add('hidden');
+    weekView.classList.remove('show');
+    watchedView.classList.add('show');
+    renderWatchedView();
+    return;
+  }
+  watchedView.classList.remove('show');
 
   if(weekViewActive){
     grid.classList.add('hidden');
@@ -1674,10 +1756,7 @@ function renderNewEpisodesShelf(){
 /* ---- estanterías del home: Pendientes / Películas / Completadas / Abandonadas ---- */
 function renderHomeShelves(){
   const shelfDefs = [
-    { key:'watchlist', label:'Pendientes', items: STATE.library.filter(i=>i.status==='watchlist') },
-    { key:'movie', label:'Películas', items: STATE.library.filter(i=>i.media_type==='movie') },
-    { key:'completed', label:'Completadas', items: STATE.library.filter(i=>i.status==='completed') },
-    { key:'dropped', label:'Abandonadas', items: STATE.library.filter(i=>i.status==='dropped') }
+    { key:'watchlist', label:'Pendientes', items: STATE.library.filter(i=>i.status==='watchlist') }
   ].filter(s=>s.items.length);
 
   const container = document.getElementById('homeShelves');
