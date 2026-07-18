@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cartelera-v1';
+const CACHE_NAME = 'cartelera-v2';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -17,22 +17,26 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first for the app shell, network passthrough for TMDB API/images.
+// Network-first: siempre intenta traer la versión más reciente del servidor;
+// solo si no hay conexión, cae a la última copia guardada en caché. Así no
+// hace falta acordarse de subir de versión este archivo cada vez que se
+// actualiza la web (que era justo el problema que teníamos antes).
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
   if (url.includes('api.themoviedb.org') || url.includes('image.tmdb.org')) {
-    return; // let these hit the network directly, don't intercept
+    return; // estas van siempre directas a la red
   }
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response && response.ok && event.request.method === 'GET') {
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
