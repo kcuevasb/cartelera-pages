@@ -183,6 +183,7 @@
   .mini-btn:hover{color:var(--text);}
   .mini-btn.primary{color:var(--text);}
   .mini-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .mini-btn-static{flex:1;font-size:11px;color:var(--text-faint);font-style:italic;}
   .mini-btn:disabled:hover{color:var(--text-dim);}
   .mini-btn + .mini-btn{text-align:right;}
 
@@ -1228,16 +1229,16 @@ async function renderExploreView(){
 function renderExploreRow(sectionKey, items){
   const row = document.getElementById(`explore-row-${sectionKey}`);
   if(!row) return;
-  if(!items.length){ row.innerHTML = `<p class="help-text">Sin resultados.</p>`; return; }
-  row.innerHTML = items.map(it=>{
-    const already = STATE.library.some(li => li.tmdb_id === it.id && li.media_type === it.media_type);
+  const visible = items.filter(it => !STATE.library.some(li => li.tmdb_id === it.id && li.media_type === it.media_type));
+  if(!visible.length){ row.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`; return; }
+  row.innerHTML = visible.map(it=>{
     const year = it.date ? it.date.slice(0,4) : 's/f';
     return `
       <div class="explore-card">
         ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:130px;height:195px;background:#0d0d0d;border-radius:3px;"></div>`}
         <div class="ec-title">${escapeHtml(it.title||'')}</div>
         <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
-        <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" ${already?'disabled':''}>${already?'Añadida':'Añadir'}</button>
+        <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}">Añadir</button>
       </div>
     `;
   }).join('');
@@ -1246,7 +1247,11 @@ function renderExploreRow(sectionKey, items){
       btn.disabled = true;
       btn.textContent = 'Añadiendo…';
       await addItem({ id: Number(btn.dataset.exploreId), media_type: btn.dataset.exploreType });
-      btn.textContent = 'Añadida';
+      const card = btn.closest('.explore-card');
+      if(card) card.remove();
+      if(!row.querySelector('.explore-card')){
+        row.innerHTML = `<p class="help-text">Ya tienes todo esto en tu biblioteca.</p>`;
+      }
     });
   });
 }
@@ -1717,10 +1722,8 @@ function buildCard(item){
 
   let nextBtnHtml;
   if(item.media_type === 'tv'){
-    if(!nextEp){
-      nextBtnHtml = `<button class="mini-btn primary" data-action="next-ep" disabled>Al día</button>`;
-    } else if(!nextEpAired){
-      nextBtnHtml = `<button class="mini-btn" data-action="next-ep" disabled title="Aún no se ha emitido">Aún no emitido</button>`;
+    if(!nextEp || !nextEpAired){
+      nextBtnHtml = `<span class="mini-btn-static">Estás al día</span>`;
     } else {
       nextBtnHtml = `<button class="mini-btn primary" data-action="next-ep">✓ Siguiente ep.</button>`;
     }
