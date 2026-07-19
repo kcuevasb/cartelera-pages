@@ -432,11 +432,86 @@
   }
   .notes-field textarea:focus{outline:none;border-color:var(--text-dim);}
 
+  .detail-subhead{font-size:12px;font-weight:600;color:var(--text-dim);margin:16px 0 8px;font-family:var(--font-display);}
+
+  /* etiquetas */
+  .tags-field{margin-top:4px;}
+  .tags-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .tag-chip{
+    display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border-strong);
+    border-radius:14px;padding:4px 10px;font-size:11.5px;color:var(--text-dim);
+  }
+  .tag-chip button{background:none;border:none;color:var(--text-faint);font-size:12px;padding:0;line-height:1;}
+  .tag-chip button:hover{color:var(--rust,#c1553a);}
+  #tagInput{
+    width:100%;background:transparent;border:1px solid var(--border-strong);color:var(--text);
+    border-radius:5px;padding:8px 10px;font-size:12.5px;font-family:var(--font-body);
+  }
+  #tagInput:focus{outline:none;border-color:var(--text-dim);}
+
+  /* dónde verlo */
+  .providers-body{display:flex;flex-wrap:wrap;gap:8px;}
+  .provider-chip{
+    display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);
+    border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--text-dim);
+  }
+  .provider-chip img{width:18px;height:18px;border-radius:4px;}
+  .providers-empty{font-size:12px;color:var(--text-faint);}
+
+  /* diario */
+  .diary-add-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .diary-add-row input[type="date"]{
+    background:transparent;border:1px solid var(--border-strong);color:var(--text);
+    border-radius:5px;padding:7px 9px;font-size:12px;font-family:var(--font-body);flex:0 0 auto;
+  }
+  .diary-add-row input[type="text"]{
+    flex:1;min-width:120px;background:transparent;border:1px solid var(--border-strong);color:var(--text);
+    border-radius:5px;padding:7px 9px;font-size:12px;font-family:var(--font-body);
+  }
+  .diary-add-btn{flex:0 0 auto;border:1px solid var(--border-strong);padding:7px 12px;border-radius:5px;}
+  .diary-list{display:flex;flex-direction:column;gap:0;max-height:180px;overflow-y:auto;}
+  .diary-row{
+    display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;
+  }
+  .diary-row:last-child{border-bottom:none;}
+  .diary-date{font-family:var(--font-mono);color:var(--text-faint);flex:0 0 auto;font-size:11px;}
+  .diary-info{flex:1;min-width:0;}
+  .diary-note{color:var(--text-faint);font-size:11px;}
+  .diary-del{background:none;border:none;color:var(--text-faint);font-size:13px;padding:2px 6px;}
+  .diary-del:hover{color:var(--rust,#c1553a);}
+  .diary-empty{font-size:12px;color:var(--text-faint);}
+
+  /* ---------- WRAPPED / YEAR IN REVIEW ---------- */
+  .wrapped-modal{max-width:480px;}
+  .wrapped-hero{
+    text-align:center;padding:22px 10px 26px;border-bottom:1px solid var(--border);margin-bottom:18px;
+  }
+  .wrapped-hero .wrapped-year{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);letter-spacing:1px;}
+  .wrapped-hero .wrapped-headline{
+    font-family:var(--font-display);font-weight:600;font-style:italic;font-size:26px;color:var(--accent);
+    margin-top:6px;line-height:1.3;
+  }
+  .wrapped-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+  .wrapped-stat-item{text-align:left;}
+  .wrapped-stat-value{font-family:var(--font-mono);font-size:22px;color:var(--text);font-weight:600;}
+  .wrapped-stat-label{font-size:11px;color:var(--text-faint);margin-top:2px;}
+  .wrapped-highlight{
+    border:1px solid var(--border-strong);border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;color:var(--text-dim);
+  }
+  .wrapped-highlight strong{color:var(--text);}
+  .wrapped-empty{font-size:13px;color:var(--text-faint);text-align:center;padding:30px 10px;}
+
   /* ---------- SETTINGS SECTIONS ---------- */
   .settings-section{border-top:1px solid var(--border);padding-top:16px;margin-top:16px;}
   .settings-section:first-of-type{border-top:none;padding-top:0;margin-top:0;}
   .settings-section h3{font-size:12.5px;font-weight:600;margin:0 0 8px;font-family:var(--font-display);}
   .settings-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .platform-check-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px;}
+  .platform-check-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);font-weight:500;}
+  .platform-filter-toggle{
+    display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);font-weight:500;cursor:pointer;
+  }
+  .platform-filter-toggle.hidden{display:none;}
   .file-label{
     display:inline-block;border:1px solid var(--border-strong);color:var(--text-dim);
     border-radius:5px;padding:7px 12px;font-size:12px;font-weight:500;cursor:pointer;
@@ -615,6 +690,9 @@
     <select class="genre-select" id="genreSelect">
       <option value="">Todos los géneros</option>
     </select>
+    <select class="genre-select" id="tagSelect">
+      <option value="">Todas las etiquetas</option>
+    </select>
     <select class="sort-select" id="sortSelect">
       <option value="added_desc">Añadido recientemente</option>
       <option value="next_air">Próximo estreno</option>
@@ -630,6 +708,9 @@
       <button class="back-home-btn hidden" id="backHomeBtn">← Inicio</button>
       <h2 id="sectionHeadingTitle">Viendo</h2>
     </div>
+    <label class="platform-filter-toggle hidden" id="platformFilterToggle">
+      <input type="checkbox" id="onlyMyPlatformsCheck"> Solo en mis plataformas
+    </label>
     <div class="sync-note" id="syncNote">—</div>
   </div>
 
@@ -725,6 +806,9 @@
           <div class="stub-sub" id="statFavoritesSub">—</div>
         </div>
       </div>
+      <div style="margin-top:14px;">
+        <button class="mini-btn" id="openWrappedBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Ver tu año en Cartelera →</button>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -755,6 +839,27 @@
       <label style="font-size:12px;color:var(--text-dim);font-weight:500;display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="specialsCheck"> Incluir especiales (temporada 0) en series nuevas y al sincronizar
       </label>
+    </div>
+
+    <div class="settings-section">
+      <h3>Tus plataformas</h3>
+      <p class="help-text" style="margin-top:0;">Márcalas para poder filtrar tus Pendientes por lo que ya puedes ver ahora mismo.</p>
+      <div class="platform-check-grid" id="platformCheckGrid">
+        ${['Netflix','HBO Max','Amazon Prime Video','Disney Plus','Movistar Plus+','Filmin','SkyShowtime','Apple TV Plus','Rakuten TV'].map(p=>`
+          <label class="platform-check-item">
+            <input type="checkbox" value="${p}" class="my-platform-check"> ${p}
+          </label>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Notificaciones</h3>
+      <p class="help-text" style="margin-top:0;">Avisa en el navegador cuando se estrene un episodio nuevo de algo que sigues (aunque tengas Cartelera cerrada en otra pestaña).</p>
+      <div class="settings-row">
+        <button class="mini-btn" id="notifPermBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Activar notificaciones</button>
+        <span class="help-text" id="notifStatus" style="margin:0;"></span>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -816,6 +921,20 @@
   </div>
 </div>
 
+<!-- WRAPPED / YEAR IN REVIEW MODAL -->
+<div class="overlay hidden" id="wrappedOverlay">
+  <div class="modal wrapped-modal">
+    <div class="modal-head">
+      <h2 id="wrappedTitle">Tu año en Cartelera</h2>
+      <button class="close-x" data-close="wrappedOverlay" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="wrappedContent"></div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+      <button class="mini-btn" id="shareWrappedBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Compartir</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -868,11 +987,38 @@ async function loadState(){
   catch(e){ STATE.includeSpecials = false; }
   try{ STATE.viewMode = localStorage.getItem('tvtime:viewmode') || 'grid'; }
   catch(e){ STATE.viewMode = 'grid'; }
+  try{
+    const mp = localStorage.getItem('tvtime:myproviders');
+    STATE.myProviders = mp ? JSON.parse(mp) : [];
+  }catch(e){ STATE.myProviders = []; }
+  migrateLibraryDataModel();
   document.documentElement.setAttribute('data-theme', STATE.theme);
   document.getElementById('sortSelect').value = STATE.sortMode;
   document.getElementById('specialsCheck').checked = STATE.includeSpecials;
   document.getElementById('viewToggleBtn').textContent = STATE.viewMode === 'list' ? 'Vista pósters' : 'Vista lista';
   document.getElementById('viewToggleBtn').classList.toggle('active', STATE.viewMode === 'list');
+}
+
+/** Rellena campos nuevos (diario, etiquetas...) en items guardados antes de que existieran. */
+function migrateLibraryDataModel(){
+  let changed = false;
+  STATE.library.forEach(item=>{
+    if(!Array.isArray(item.tags)){ item.tags = []; changed = true; }
+    if(!Array.isArray(item.diary)){
+      item.diary = [];
+      // entrada retroactiva "a bulto" para que el diario y el Year in Review no empiecen vacíos
+      if(item.media_type === 'movie' && item.watched_movie){
+        const date = (item.watched_at||'').slice(0,10) || todayISO();
+        item.diary.push({ date, label: 'Película completa', note: '', synthetic: true });
+      } else if(item.media_type === 'tv' && item.watched && item.watched.length){
+        const date = new Date(item.last_watched_at || item.added_at || Date.now()).toISOString().slice(0,10);
+        item.diary.push({ date, label: `${item.watched.length} episodios (progreso migrado)`, note: '', synthetic: true });
+      }
+      changed = true;
+    }
+    if(typeof item.last_notified_episode === 'undefined'){ item.last_notified_episode = null; changed = true; }
+  });
+  if(changed) saveLibrary();
 }
 async function saveLibrary(){
   try{
@@ -891,6 +1037,12 @@ async function saveTheme(theme){
     STATE.theme = theme;
     document.documentElement.setAttribute('data-theme', theme);
   }catch(e){ console.error(e); showToast('No se pudo guardar el tema.'); }
+}
+async function saveMyProviders(list){
+  try{
+    localStorage.setItem('tvtime:myproviders', JSON.stringify(list));
+    STATE.myProviders = list;
+  }catch(e){ console.error(e); }
 }
 async function saveSortMode(mode){
   try{
@@ -1080,6 +1232,8 @@ async function addItem(result, forcedStatus){
         rating: 0,
         notes: '',
         favorite: false,
+        tags: [],
+        diary: [],
         tmdb_status: d.status,
         episode_run_time: (d.episode_run_time && d.episode_run_time[0]) || 40,
         seasons: (d.seasons||[]).filter(s=>STATE.includeSpecials || s.season_number>0).map(s=>({
@@ -1098,6 +1252,7 @@ async function addItem(result, forcedStatus){
         item.watched = item.seasons.flatMap(s =>
           Array.from({length: s.episode_count}, (_, i) => `S${s.season_number}E${i+1}`)
         );
+        item.diary.push({ date: todayISO(), label: `Temporada(s) completa(s) (${item.watched.length} episodios)`, note: '' });
       }
       STATE.library.unshift(item);
     } else {
@@ -1114,12 +1269,17 @@ async function addItem(result, forcedStatus){
         rating: 0,
         notes: '',
         favorite: false,
+        tags: [],
+        diary: [],
         runtime: d.runtime || 0,
         release_date: d.release_date,
         watched_movie: forcedStatus === 'completed',
         watched_at: forcedStatus === 'completed' ? new Date().toISOString() : null,
         last_synced: Date.now()
       };
+      if(forcedStatus === 'completed'){
+        item.diary.push({ date: todayISO(), label: 'Película completa', note: '' });
+      }
       STATE.library.unshift(item);
     }
     await saveLibrary();
@@ -1142,6 +1302,10 @@ document.getElementById('addBtn').addEventListener('click', ()=>{
 document.getElementById('apiKeyBtn').addEventListener('click', ()=>{
   document.getElementById('apiKeyInput').value = STATE.apiKey || '';
   document.getElementById('csvImportStatus').textContent = '';
+  document.querySelectorAll('.my-platform-check').forEach(cb=>{
+    cb.checked = STATE.myProviders.includes(cb.value);
+  });
+  updateNotifStatus();
   openModal('apiKeyOverlay');
 });
 document.getElementById('saveApiKey').addEventListener('click', async ()=>{
@@ -1151,6 +1315,75 @@ document.getElementById('saveApiKey').addEventListener('click', async ()=>{
   closeModal('apiKeyOverlay');
   showToast('Clave guardada. ¡Ya puedes buscar!');
 });
+
+/* ---- tus plataformas ---- */
+document.querySelectorAll('.my-platform-check').forEach(cb=>{
+  cb.addEventListener('change', async ()=>{
+    const checked = [...document.querySelectorAll('.my-platform-check:checked')].map(c=>c.value);
+    await saveMyProviders(checked);
+  });
+});
+
+/* ---- notificaciones del navegador ---- */
+function updateNotifStatus(){
+  const status = document.getElementById('notifStatus');
+  const btn = document.getElementById('notifPermBtn');
+  if(!('Notification' in window)){
+    status.textContent = 'Tu navegador no soporta notificaciones.';
+    btn.disabled = true;
+    return;
+  }
+  if(Notification.permission === 'granted'){
+    status.textContent = '✓ Activadas';
+    btn.textContent = 'Ya activadas';
+    btn.disabled = true;
+  } else if(Notification.permission === 'denied'){
+    status.textContent = 'Bloqueadas — actívalas desde los ajustes del navegador para este sitio.';
+    btn.disabled = true;
+  } else {
+    status.textContent = 'Aún no activadas';
+    btn.disabled = false;
+    btn.textContent = 'Activar notificaciones';
+  }
+}
+document.getElementById('notifPermBtn').addEventListener('click', async ()=>{
+  if(!('Notification' in window)) return;
+  const perm = await Notification.requestPermission();
+  updateNotifStatus();
+  if(perm === 'granted') showToast('Notificaciones activadas');
+});
+
+/* ---- filtro "solo en mis plataformas" (Pendientes) ---- */
+document.getElementById('onlyMyPlatformsCheck').addEventListener('change', async (e)=>{
+  if(e.target.checked){
+    await applyPlatformFilterToWatchlist();
+  } else {
+    renderLibrary();
+  }
+});
+async function applyPlatformFilterToWatchlist(){
+  if(!STATE.myProviders.length){
+    showToast('Selecciona primero tus plataformas en Ajustes (botón ⚙).');
+    document.getElementById('onlyMyPlatformsCheck').checked = false;
+    return;
+  }
+  const items = filteredLibrary();
+  const grid = document.getElementById('grid');
+  grid.innerHTML = `<p class="help-text" style="grid-column:1/-1;">Consultando disponibilidad…</p>`;
+  const results = await Promise.all(items.map(async it=>{
+    const p = await fetchProviders(it.media_type, it.tmdb_id);
+    const match = p.flatrate.some(f=> STATE.myProviders.includes(f.name));
+    return { it, match };
+  }));
+  if(!document.getElementById('onlyMyPlatformsCheck').checked) return; // el usuario ya lo desmarcó mientras cargaba
+  grid.innerHTML = '';
+  const matched = results.filter(r=>r.match).map(r=>r.it);
+  if(!matched.length){
+    grid.innerHTML = `<p class="help-text" style="grid-column:1/-1;">Nada de tus pendientes está en tus plataformas ahora mismo.</p>`;
+    return;
+  }
+  matched.forEach(item=> grid.appendChild(buildCard(item, true)));
+}
 
 /* ---- theme ---- */
 async function toggleTheme(){
@@ -1327,6 +1560,16 @@ document.getElementById('genreSelect').addEventListener('change', (e)=>{
   resetPagination();
   renderLibrary();
 });
+document.getElementById('tagSelect').addEventListener('change', (e)=>{
+  currentTag = e.target.value;
+  if(currentTag){
+    if(homeMode){ homeMode = false; currentFilter = 'all'; }
+    weekViewActive = false;
+    exploreViewActive = false;
+  }
+  resetPagination();
+  renderLibrary();
+});
 
 /* ---- week view toggle ---- */
 document.getElementById('weekViewBtn').addEventListener('click', ()=>{
@@ -1427,6 +1670,9 @@ function renderFavoritesView(){
   if(currentGenre){
     items = items.filter(i=> (i.genres||[]).includes(currentGenre));
   }
+  if(currentTag){
+    items = items.filter(i=> (i.tags||[]).includes(currentTag));
+  }
   if(librarySearch){
     items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
   }
@@ -1452,6 +1698,9 @@ function renderWatchedView(){
   let items = STATE.library.filter(i => i.status === 'completed' && i.media_type === watchedMediaType);
   if(currentGenre){
     items = items.filter(i=> (i.genres||[]).includes(currentGenre));
+  }
+  if(currentTag){
+    items = items.filter(i=> (i.tags||[]).includes(currentTag));
   }
   if(librarySearch){
     items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
@@ -1813,7 +2062,11 @@ function markEpisode(item, season_number, episode_number, watched){
   const idx = item.watched.indexOf(code);
   if(watched && idx === -1) item.watched.push(code);
   if(!watched && idx !== -1) item.watched.splice(idx,1);
-  if(watched) item.last_watched_at = Date.now();
+  if(watched){
+    item.last_watched_at = Date.now();
+    if(!Array.isArray(item.diary)) item.diary = [];
+    item.diary.push({ date: todayISO(), label: `T${season_number}E${episode_number}`, note: '' });
+  }
 }
 /**
  * ¿Se ha emitido ya un episodio concreto? Si tenemos su fecha exacta (porque
@@ -1883,9 +2136,103 @@ function computeStats(){
   document.getElementById('statFavoritesSub').textContent = favoritesCount ? topGenre : 'sin favoritos aún';
 }
 
+/**
+ * "Tu año en Cartelera": recorre las entradas de diario del año pedido.
+ * Los items migrados desde antes del diario aportan una entrada "a bulto"
+ * (marcada como synthetic), así que el resumen no sale vacío desde el
+ * primer día, aunque el detalle diario-a-diario solo será fino a partir
+ * de ahora.
+ */
+function computeWrapped(year){
+  const yearStr = String(year);
+  let episodeCount = 0, movieCount = 0, totalMinutes = 0;
+  const genreCounts = {};
+  const dayCounts = {};
+  const titleSet = new Set();
+  let topRatedTitle = null, topRatedValue = 0;
+
+  STATE.library.forEach(item=>{
+    const entries = (item.diary||[]).filter(e => (e.date||'').startsWith(yearStr));
+    if(!entries.length) return;
+    titleSet.add(item.title);
+    entries.forEach(e=>{
+      dayCounts[e.date] = (dayCounts[e.date]||0) + 1;
+      if(item.media_type === 'movie'){
+        movieCount++;
+        totalMinutes += item.runtime || 0;
+      } else {
+        // una entrada "migrada" puede representar varios episodios de golpe
+        const match = /^(\d+) episodios/.exec(e.label||'');
+        const count = match ? Number(match[1]) : 1;
+        episodeCount += count;
+        totalMinutes += count * (item.episode_run_time || 40);
+      }
+    });
+    (item.genres||[]).forEach(g=>{ genreCounts[g] = (genreCounts[g]||0) + 1; });
+    if((item.rating||0) > topRatedValue){ topRatedValue = item.rating; topRatedTitle = item.title; }
+  });
+
+  const genreEntries = Object.entries(genreCounts).sort((a,b)=>b[1]-a[1]);
+  const dayEntries = Object.entries(dayCounts).sort((a,b)=>b[1]-a[1]);
+
+  return {
+    year,
+    hasData: titleSet.size > 0,
+    totalHours: Math.round(totalMinutes/60),
+    episodeCount, movieCount,
+    titleCount: titleSet.size,
+    topGenre: genreEntries[0] ? genreEntries[0][0] : null,
+    bingeDay: dayEntries[0] ? { date: dayEntries[0][0], count: dayEntries[0][1] } : null,
+    topRatedTitle: topRatedValue >= 4 ? topRatedTitle : null
+  };
+}
+
+function renderWrapped(year){
+  const data = computeWrapped(year);
+  document.getElementById('wrappedTitle').textContent = `Tu ${year} en Cartelera`;
+  const content = document.getElementById('wrappedContent');
+  if(!data.hasData){
+    content.innerHTML = `<p class="wrapped-empty">Todavía no hay entradas de diario de ${year}. Marca episodios o pelis como vistos y vuelve más adelante.</p>`;
+    return;
+  }
+  content.innerHTML = `
+    <div class="wrapped-hero">
+      <div class="wrapped-year">${year}</div>
+      <div class="wrapped-headline">${data.totalHours}h delante de una pantalla</div>
+    </div>
+    <div class="wrapped-stats-grid">
+      <div class="wrapped-stat-item"><div class="wrapped-stat-value">${data.episodeCount}</div><div class="wrapped-stat-label">episodios vistos</div></div>
+      <div class="wrapped-stat-item"><div class="wrapped-stat-value">${data.movieCount}</div><div class="wrapped-stat-label">películas vistas</div></div>
+      <div class="wrapped-stat-item"><div class="wrapped-stat-value">${data.titleCount}</div><div class="wrapped-stat-label">títulos distintos</div></div>
+      <div class="wrapped-stat-item"><div class="wrapped-stat-value">${data.topGenre || '—'}</div><div class="wrapped-stat-label">género estrella</div></div>
+    </div>
+    ${data.bingeDay ? `<div class="wrapped-highlight">Tu día más maratoniano fue el <strong>${fmtDate(data.bingeDay.date)}</strong>, con ${data.bingeDay.count} entradas de diario.</div>` : ''}
+    ${data.topRatedTitle ? `<div class="wrapped-highlight">Tu joya del año: <strong>${escapeHtml(data.topRatedTitle)}</strong>.</div>` : ''}
+  `;
+}
+
+document.getElementById('openWrappedBtn').addEventListener('click', ()=>{
+  closeModal('apiKeyOverlay');
+  renderWrapped(new Date().getFullYear());
+  openModal('wrappedOverlay');
+});
+document.getElementById('shareWrappedBtn').addEventListener('click', async ()=>{
+  const year = new Date().getFullYear();
+  const data = computeWrapped(year);
+  if(!data.hasData){ showToast('Nada que compartir todavía.'); return; }
+  const text = `Mi ${year} en Cartelera 🎬\n\n${data.totalHours}h vistas · ${data.episodeCount} episodios · ${data.movieCount} pelis · ${data.titleCount} títulos distintos\nGénero estrella: ${data.topGenre || '—'}`;
+  if(navigator.share){
+    try{ await navigator.share({ text, title: 'Mi año en Cartelera' }); } catch(e){}
+    return;
+  }
+  try{ await navigator.clipboard.writeText(text); showToast('Resumen copiado al portapapeles'); }
+  catch(e){ showToast('No se pudo compartir ni copiar.'); }
+});
+
 /* ============ RENDER LIBRARY ============ */
 let homeMode = true;
 let currentGenre = '';
+let currentTag = '';
 let renderedCount = 24;
 const PAGE_SIZE = 24;
 
@@ -1930,6 +2277,9 @@ function filteredLibrary(){
 
   if(currentGenre){
     items = items.filter(i=> (i.genres||[]).includes(currentGenre));
+  }
+  if(currentTag){
+    items = items.filter(i=> (i.tags||[]).includes(currentTag));
   }
   if(librarySearch){
     items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
@@ -1977,6 +2327,17 @@ function populateGenreSelect(){
   else currentGenre = '';
 }
 
+function populateTagSelect(){
+  const select = document.getElementById('tagSelect');
+  const tags = new Set();
+  STATE.library.forEach(i => (i.tags||[]).forEach(t=>tags.add(t)));
+  const sorted = [...tags].sort((a,b)=>a.localeCompare(b,'es'));
+  const prev = select.value;
+  select.innerHTML = `<option value="">Todas las etiquetas</option>` + sorted.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if(sorted.includes(prev)) select.value = prev;
+  else currentTag = '';
+}
+
 /**
  * "Todo" ya no mezcla vistas con pendientes en una sola lista: agrupa por
  * estado (Viendo / Pendientes / Vistas / Abandonadas), cada uno como su
@@ -2016,6 +2377,7 @@ function renderLibrary(){
   computeStats();
   renderInactivityBanner();
   populateGenreSelect();
+  populateTagSelect();
 
   const grid = document.getElementById('grid');
   const allSections = document.getElementById('allSections');
@@ -2110,6 +2472,7 @@ function renderLibrary(){
     sectionTitle.textContent = 'Viendo';
     allSections.classList.remove('show');
     homeShelves.classList.remove('hidden');
+    document.getElementById('platformFilterToggle').classList.add('hidden');
     renderHomeShelves();
 
     const watchingItems = STATE.library.filter(i=>i.status==='watching');
@@ -2125,6 +2488,14 @@ function renderLibrary(){
     sectionTitle.textContent = categoryLabel(currentFilter);
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
+
+    const platformToggle = document.getElementById('platformFilterToggle');
+    if(currentFilter === 'watchlist'){
+      platformToggle.classList.remove('hidden');
+    } else {
+      platformToggle.classList.add('hidden');
+      document.getElementById('onlyMyPlatformsCheck').checked = false;
+    }
 
     if(currentFilter === 'all'){
       grid.classList.add('hidden');
@@ -2454,7 +2825,11 @@ function buildCard(item, hidePill){
       item.watched_movie = !item.watched_movie;
       item.watched_at = item.watched_movie ? new Date().toISOString() : null;
       item.status = item.watched_movie ? 'completed' : 'watchlist';
-      if(item.watched_movie) item.last_watched_at = Date.now();
+      if(item.watched_movie){
+        item.last_watched_at = Date.now();
+        if(!Array.isArray(item.diary)) item.diary = [];
+        item.diary.push({ date: todayISO(), label: 'Película completa', note: '' });
+      }
       await saveLibrary();
       renderLibrary();
     });
@@ -2479,6 +2854,87 @@ function refreshSeasonHeader(item, seasonNumber){
   if(countEl) countEl.textContent = `${watchedInSeason}/${season.episode_count}`;
   const barEl = block.querySelector('.season-progress-mini div');
   if(barEl) barEl.style.width = `${season.episode_count ? (watchedInSeason/season.episode_count*100) : 0}%`;
+}
+
+function renderTagsSection(item){
+  const row = document.getElementById('tagsChipRow');
+  if(!row) return;
+  const tags = item.tags || [];
+  if(!tags.length){ row.innerHTML = ''; return; }
+  row.innerHTML = tags.map(t=>`
+    <span class="tag-chip">${escapeHtml(t)}<button data-remove-tag="${escapeHtml(t)}" aria-label="Quitar etiqueta ${escapeHtml(t)}">✕</button></span>
+  `).join('');
+  row.querySelectorAll('[data-remove-tag]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      item.tags = (item.tags||[]).filter(t=>t!==btn.dataset.removeTag);
+      await saveLibrary();
+      renderTagsSection(item);
+    });
+  });
+}
+
+function renderDiarySection(item){
+  const list = document.getElementById('diaryList');
+  if(!list) return;
+  const entries = [...(item.diary||[])].sort((a,b)=> a.date < b.date ? 1 : -1);
+  if(!entries.length){
+    list.innerHTML = `<p class="diary-empty">Sin entradas todavía. Se registran solas al marcar algo visto, o añade una a mano arriba.</p>`;
+    return;
+  }
+  list.innerHTML = entries.map((e,idx)=>`
+    <div class="diary-row">
+      <span class="diary-date">${fmtDate(e.date)}</span>
+      <span class="diary-info">${escapeHtml(e.label||'')}${e.note ? ` <span class="diary-note">— ${escapeHtml(e.note)}</span>` : ''}</span>
+      <button class="diary-del" data-diary-idx="${idx}" aria-label="Borrar entrada de diario">✕</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-diary-idx]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const sorted = [...(item.diary||[])].sort((a,b)=> a.date < b.date ? 1 : -1);
+      const target = sorted[Number(btn.dataset.diaryIdx)];
+      const realIdx = item.diary.indexOf(target);
+      if(realIdx !== -1) item.diary.splice(realIdx,1);
+      await saveLibrary();
+      renderDiarySection(item);
+    });
+  });
+}
+
+const providerCache = {};
+async function fetchProviders(mediaType, tmdbId){
+  const cacheKey = `${mediaType}:${tmdbId}`;
+  if(providerCache[cacheKey]) return providerCache[cacheKey];
+  try{
+    const data = await tmdbFetch(`/${mediaType}/${tmdbId}/watch/providers`, {});
+    const region = (data.results && (data.results.ES || data.results.US)) || null;
+    const result = region ? {
+      flatrate: (region.flatrate||[]).map(p=>({ name:p.provider_name, logo:p.logo_path })),
+      link: region.link || null
+    } : { flatrate: [], link: null };
+    providerCache[cacheKey] = result;
+    return result;
+  }catch(err){
+    return { flatrate: [], link: null };
+  }
+}
+async function loadProvidersSection(item){
+  const body = document.getElementById('providersBody');
+  if(!body) return;
+  try{
+    const result = await fetchProviders(item.media_type, item.tmdb_id);
+    if(!result.flatrate.length){
+      body.innerHTML = `<span class="providers-empty">No encontramos dónde verlo en streaming ahora mismo en España.</span>`;
+      return;
+    }
+    body.innerHTML = result.flatrate.map(p=>`
+      <span class="provider-chip">
+        ${p.logo ? `<img src="${IMG_BASE}${p.logo}" alt="">` : ''}
+        ${escapeHtml(p.name)}
+      </span>
+    `).join('') + (result.link ? `<a href="${result.link}" target="_blank" rel="noopener" class="provider-chip" style="text-decoration:none;">Ver más →</a>` : '');
+  }catch(err){
+    body.innerHTML = `<span class="providers-empty">No se pudo consultar la disponibilidad.</span>`;
+  }
 }
 
 function openDetail(uid){
@@ -2508,7 +2964,31 @@ function openDetail(uid){
     <div class="notes-field">
       <textarea id="notesInput" placeholder="Notas personales (opinión, dónde lo dejaste, recomendaciones…)">${escapeHtml(item.notes||'')}</textarea>
     </div>
+
+    <div class="tags-field">
+      <div class="tags-chip-row" id="tagsChipRow"></div>
+      <input type="text" id="tagInput" placeholder="Añadir etiqueta y pulsar Enter (ej. comfort watch)">
+    </div>
+
+    <div class="providers-field">
+      <div class="detail-subhead">Dónde verlo</div>
+      <div class="providers-body" id="providersBody"><p class="loader-line">Consultando disponibilidad…</p></div>
+    </div>
+
+    <div class="diary-field">
+      <div class="detail-subhead">Diario</div>
+      <div class="diary-add-row">
+        <input type="date" id="diaryDateInput" value="${todayISO()}">
+        <input type="text" id="diaryNoteInput" placeholder="Nota (opcional, ej. rewatch)">
+        <button class="mini-btn diary-add-btn" id="diaryAddBtn">+ Añadir entrada</button>
+      </div>
+      <div class="diary-list" id="diaryList"></div>
+    </div>
   `;
+
+  renderDiarySection(item);
+  renderTagsSection(item);
+  loadProvidersSection(item);
 
   if(item.media_type === 'tv'){
     html += `<div id="seasonsWrap">`;
@@ -2614,6 +3094,40 @@ function openDetail(uid){
     }, 500);
   });
 
+  // etiquetas
+  const tagInput = content.querySelector('#tagInput');
+  tagInput.addEventListener('keydown', async (e)=>{
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    const val = tagInput.value.trim();
+    if(!val) return;
+    if(!Array.isArray(item.tags)) item.tags = [];
+    if(!item.tags.some(t=>t.toLowerCase()===val.toLowerCase())){
+      item.tags.push(val);
+      await saveLibrary();
+      renderTagsSection(item);
+    }
+    tagInput.value = '';
+  });
+
+  // diario: añadir entrada manual
+  content.querySelector('#diaryAddBtn').addEventListener('click', async ()=>{
+    const dateEl = content.querySelector('#diaryDateInput');
+    const noteEl = content.querySelector('#diaryNoteInput');
+    const date = dateEl.value || todayISO();
+    if(!Array.isArray(item.diary)) item.diary = [];
+    item.diary.push({
+      date,
+      label: item.media_type === 'movie' ? 'Película completa (rewatch)' : 'Entrada manual',
+      note: noteEl.value.trim()
+    });
+    item.diary.sort((a,b)=> a.date < b.date ? 1 : -1);
+    await saveLibrary();
+    noteEl.value = '';
+    renderDiarySection(item);
+    showToast('Entrada de diario añadida');
+  });
+
   if(item.media_type === 'tv'){
     content.querySelectorAll('[data-season-toggle]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
@@ -2710,7 +3224,12 @@ function openDetail(uid){
       item.watched_movie = cb.checked;
       item.watched_at = cb.checked ? new Date().toISOString() : null;
       item.status = cb.checked ? 'completed' : 'watchlist';
-      if(cb.checked) item.last_watched_at = Date.now();
+      if(cb.checked){
+        item.last_watched_at = Date.now();
+        if(!Array.isArray(item.diary)) item.diary = [];
+        item.diary.push({ date: todayISO(), label: 'Película completa', note: '' });
+        renderDiarySection(item);
+      }
       await saveLibrary();
       renderLibrary();
     });
@@ -2760,14 +3279,37 @@ async function syncAll(showFeedback){
   document.getElementById('syncBtn').style.opacity = '.5';
   let ok = 0;
   const revived = [];
+  const notifiable = [];
   for(const item of tvItems){
     const result = await syncItem(item);
     if(result.ok) ok++;
     if(result.revived) revived.push(result.revived);
     item.last_synced = Date.now();
+
+    if(hasFreshUnwatchedEpisode(item)){
+      const code = `S${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number}`;
+      if(item.last_notified_episode !== code){
+        notifiable.push({ item, code });
+      }
+    }
     await new Promise(r=>setTimeout(r, 120)); // suave, evita rate limit
   }
   document.getElementById('syncBtn').style.opacity = '1';
+
+  if(notifiable.length && 'Notification' in window && Notification.permission === 'granted'){
+    if(notifiable.length === 1){
+      const { item } = notifiable[0];
+      new Notification('Episodio nuevo en Cartelera', {
+        body: `${item.title} · T${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number} ya disponible`
+      });
+    } else {
+      new Notification('Episodios nuevos en Cartelera', {
+        body: notifiable.map(n=>n.item.title).join(', ')
+      });
+    }
+  }
+  notifiable.forEach(({item, code})=>{ item.last_notified_episode = code; });
+
   await saveLibrary();
   renderLibrary();
   updateSyncNote();
