@@ -614,11 +614,6 @@
     <button class="week-toggle" id="weekViewBtn">Vista semanal</button>
   </div>
 
-  <div class="continue-section hidden" id="newEpisodesShelf">
-    <div class="continue-label">📺 Episodios nuevos</div>
-    <div class="continue-row" id="newEpisodesRow"></div>
-  </div>
-
   <div class="section-heading-row" id="sectionHeadingRow">
     <div class="section-heading-left">
       <button class="back-home-btn hidden" id="backHomeBtn">← Inicio</button>
@@ -1436,7 +1431,7 @@ function renderFavoritesView(){
   }
   emptyMsg.classList.add('hidden');
   grid.classList.remove('hidden');
-  items.forEach(item=> grid.appendChild(buildCard(item)));
+  items.forEach(item=> grid.appendChild(buildCard(item, false)));
 }
 
 function renderWatchedView(){
@@ -1458,7 +1453,7 @@ function renderWatchedView(){
   }
   emptyMsg.classList.add('hidden');
   grid.classList.remove('hidden');
-  items.forEach(item=> grid.appendChild(buildCard(item)));
+  items.forEach(item=> grid.appendChild(buildCard(item, true)));
 }
 
 /** Hasta 3 semillas para recomendaciones: primero favoritos, luego vistos, del tipo pedido. */
@@ -1982,7 +1977,6 @@ function renderLibrary(){
   const exploreView = document.getElementById('exploreView');
   const watchedView = document.getElementById('watchedView');
   const favoritesView = document.getElementById('favoritesView');
-  const newEpisodesShelf = document.getElementById('newEpisodesShelf');
   const caughtUpShelf = document.getElementById('caughtUpShelf');
   const homeShelves = document.getElementById('homeShelves');
   const headingRow = document.getElementById('sectionHeadingRow');
@@ -2003,7 +1997,6 @@ function renderLibrary(){
   if(exploreViewActive){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
-    newEpisodesShelf.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
@@ -2019,7 +2012,6 @@ function renderLibrary(){
   if(watchedViewActive){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
-    newEpisodesShelf.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
@@ -2034,7 +2026,6 @@ function renderLibrary(){
   if(favoritesViewActive){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
-    newEpisodesShelf.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
@@ -2048,7 +2039,6 @@ function renderLibrary(){
   if(weekViewActive){
     grid.classList.add('hidden');
     empty.classList.add('hidden');
-    newEpisodesShelf.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     headingRow.classList.add('hidden');
@@ -2066,7 +2056,6 @@ function renderLibrary(){
   if(homeMode){
     backHomeBtn.classList.add('hidden');
     sectionTitle.textContent = 'Viendo';
-    renderNewEpisodesShelf();
     homeShelves.classList.remove('hidden');
     renderHomeShelves();
 
@@ -2081,7 +2070,6 @@ function renderLibrary(){
   } else {
     backHomeBtn.classList.remove('hidden');
     sectionTitle.textContent = categoryLabel(currentFilter);
-    newEpisodesShelf.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
     items = filteredLibrary();
@@ -2109,7 +2097,8 @@ function renderLibrary(){
   }
   grid.classList.remove('hidden');
   const visible = items.slice(0, renderedCount);
-  visible.forEach(item=> grid.appendChild(buildCard(item)));
+  const singleStatusView = homeMode || (currentFilter !== 'all' && currentFilter !== 'movie');
+  visible.forEach(item=> grid.appendChild(buildCard(item, singleStatusView)));
 
   if(items.length > visible.length){
     const wrap = document.createElement('div');
@@ -2160,25 +2149,6 @@ function renderCaughtUpShelf(items){
 }
 
 /* ---- episodios nuevos ---- */
-function renderNewEpisodesShelf(){
-  const container = document.getElementById('newEpisodesShelf');
-  const row = document.getElementById('newEpisodesRow');
-  const items = STATE.library.filter(hasFreshUnwatchedEpisode);
-  if(!items.length){ container.classList.add('hidden'); return; }
-  container.classList.remove('hidden');
-  row.innerHTML = items.map(item=>{
-    const next = item.next_episode_to_air;
-    return `
-      <div class="continue-card" data-open="${item.uid}" tabindex="0" role="button" aria-label="Abrir ${escapeHtml(item.title)}">
-        ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="">` : `<div style="width:110px;height:165px;background:#0d0d0d;border-radius:3px;"></div>`}
-        <div class="cc-title">${escapeHtml(item.title)}</div>
-        <div class="cc-meta">T${next.season_number}E${next.episode_number} · ${fmtDate(next.air_date)}</div>
-      </div>
-    `;
-  }).join('');
-  wireShelfCardOpenHandlers(row);
-}
-
 /* ---- estanterías del home: Pendientes / Películas / Completadas / Abandonadas ---- */
 function renderHomeShelves(){
   const shelfDefs = [
@@ -2316,7 +2286,7 @@ function renderWeekView(){
   }).join('');
 }
 
-function buildCard(item){
+function buildCard(item, hidePill){
   const card = document.createElement('div');
   card.className = 'card';
 
@@ -2368,7 +2338,7 @@ function buildCard(item){
       <div class="card-info">
         <div class="card-title">${escapeHtml(item.title)}</div>
         <div class="card-meta">${metaLine}</div>
-        <span class="status-pill status-${item.status}">${statusLabels[item.status]}</span>
+        ${hidePill ? '' : `<span class="status-pill status-${item.status}">${statusLabels[item.status]}</span>`}
         <div class="next-ep"><span>${nextLine}</span></div>
         <div class="card-actions">
           ${nextBtnHtml}
