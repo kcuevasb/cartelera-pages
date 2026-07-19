@@ -123,6 +123,17 @@
 
   /* ---------- HOME SHELVES (Pendientes / Películas / Completadas / Abandonadas) ---------- */
   .home-shelves{margin-top:8px;}
+
+  /* ---------- TODO: agrupado por estado ---------- */
+  .all-sections{display:none;}
+  .all-sections.show{display:block;}
+  .all-section{margin-bottom:36px;}
+  .all-section-head{
+    display:flex;align-items:baseline;gap:10px;margin-bottom:14px;
+    padding-bottom:8px;border-bottom:1px solid var(--border);
+  }
+  .all-section-head h3{font-family:var(--font-display);font-weight:500;font-size:15px;margin:0;color:var(--text);}
+  .all-section-count{font-size:11.5px;color:var(--text-faint);font-family:var(--font-mono);}
   .shelf-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
   .shelf-count{color:var(--text-faint);font-weight:400;}
   .shelf-viewall{background:none;border:none;color:var(--text-faint);font-size:11.5px;text-decoration:underline;}
@@ -629,6 +640,7 @@
   </div>
 
   <div class="grid" id="grid"></div>
+  <div class="all-sections" id="allSections"></div>
   <div class="empty-state hidden" id="emptyState">
     <h3>Tu cartelera está vacía</h3>
     <p>Añade tu primera serie o película y Cartelera se encargará de avisarte de los episodios nuevos.</p>
@@ -1965,12 +1977,48 @@ function populateGenreSelect(){
   else currentGenre = '';
 }
 
+/**
+ * "Todo" ya no mezcla vistas con pendientes en una sola lista: agrupa por
+ * estado (Viendo / Pendientes / Vistas / Abandonadas), cada uno como su
+ * propia sección, respetando el buscador/género/orden elegidos.
+ */
+function renderAllSections(){
+  const container = document.getElementById('allSections');
+  const items = filteredLibrary();
+  if(!items.length){
+    container.innerHTML = `<p class="help-text">Nada por aquí. Prueba otra búsqueda o género.</p>`;
+    return;
+  }
+  const groups = [
+    { key:'watching', label:'Viendo', items: items.filter(i=>i.status==='watching') },
+    { key:'watchlist', label:'Pendientes', items: items.filter(i=>i.status==='watchlist') },
+    { key:'completed', label:'Vistas', items: items.filter(i=>i.status==='completed') },
+    { key:'dropped', label:'Abandonadas', items: items.filter(i=>i.status==='dropped') }
+  ].filter(g=>g.items.length);
+
+  container.innerHTML = groups.map(g=>`
+    <div class="all-section">
+      <div class="all-section-head">
+        <h3>${g.label}</h3>
+        <span class="all-section-count">(${g.items.length})</span>
+      </div>
+      <div class="grid" id="all-grid-${g.key}"></div>
+    </div>
+  `).join('');
+
+  groups.forEach(g=>{
+    const gridEl = document.getElementById(`all-grid-${g.key}`);
+    g.items.forEach(item=> gridEl.appendChild(buildCard(item, true)));
+  });
+}
+
 function renderLibrary(){
   computeStats();
   renderInactivityBanner();
   populateGenreSelect();
 
   const grid = document.getElementById('grid');
+  const allSections = document.getElementById('allSections');
   const empty = document.getElementById('emptyState');
   const weekView = document.getElementById('weekView');
   const weekBtn = document.getElementById('weekViewBtn');
@@ -1996,6 +2044,7 @@ function renderLibrary(){
 
   if(exploreViewActive){
     grid.classList.add('hidden');
+    allSections.classList.remove('show');
     empty.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
@@ -2011,6 +2060,7 @@ function renderLibrary(){
 
   if(watchedViewActive){
     grid.classList.add('hidden');
+    allSections.classList.remove('show');
     empty.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
@@ -2025,6 +2075,7 @@ function renderLibrary(){
 
   if(favoritesViewActive){
     grid.classList.add('hidden');
+    allSections.classList.remove('show');
     empty.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
@@ -2038,6 +2089,7 @@ function renderLibrary(){
 
   if(weekViewActive){
     grid.classList.add('hidden');
+    allSections.classList.remove('show');
     empty.classList.add('hidden');
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
@@ -2056,6 +2108,7 @@ function renderLibrary(){
   if(homeMode){
     backHomeBtn.classList.add('hidden');
     sectionTitle.textContent = 'Viendo';
+    allSections.classList.remove('show');
     homeShelves.classList.remove('hidden');
     renderHomeShelves();
 
@@ -2072,6 +2125,20 @@ function renderLibrary(){
     sectionTitle.textContent = categoryLabel(currentFilter);
     caughtUpShelf.classList.add('hidden');
     homeShelves.classList.add('hidden');
+
+    if(currentFilter === 'all'){
+      grid.classList.add('hidden');
+      if(!STATE.library.length){
+        empty.classList.remove('hidden');
+        allSections.classList.remove('show');
+        return;
+      }
+      empty.classList.add('hidden');
+      allSections.classList.add('show');
+      renderAllSections();
+      return;
+    }
+    allSections.classList.remove('show');
     items = filteredLibrary();
     emptyMsg = 'Nada por aquí. Prueba otra búsqueda o género.';
   }
