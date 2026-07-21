@@ -290,9 +290,9 @@
   .preview-meta{font-size:12.5px;color:var(--text-faint);margin-top:6px;font-family:var(--font-mono);}
   .preview-tagline{font-size:12.5px;color:var(--accent);font-style:italic;margin-top:8px;}
   .preview-overview{font-size:13.5px;color:var(--text-dim);margin-top:12px;line-height:1.6;max-height:none;overflow-y:visible;}
-  .preview-extra{border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px;display:flex;flex-direction:column;gap:7px;}
-  .preview-extra-row{display:flex;gap:10px;font-size:12.5px;line-height:1.5;}
-  .preview-extra-label{flex:0 0 110px;color:var(--text-faint);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px;}
+  .preview-extra{border-top:1px solid var(--border);padding-top:12px;margin-top:4px;display:flex;flex-direction:column;gap:6px;}
+  .preview-extra-row{display:flex;gap:8px;font-size:12px;line-height:1.5;}
+  .preview-extra-label{flex:0 0 88px;color:var(--text-faint);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px;}
   .preview-extra-value{flex:1;color:var(--text-dim);}
   .status-select-row{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap;}
   .status-choice{
@@ -1951,13 +1951,13 @@ async function openExplorePreview(it, cardEl){
           <div class="preview-meta">${escapeHtml(genres)}</div>
           ${d.tagline ? `<div class="preview-tagline">${escapeHtml(d.tagline)}</div>` : ''}
           <div class="preview-overview">${escapeHtml(d.overview || 'Sin sinopsis disponible.')}</div>
+          ${extraRows.length ? `
+            <div class="preview-extra">
+              ${extraRows.map(([label,val])=>`<div class="preview-extra-row"><span class="preview-extra-label">${escapeHtml(label)}</span><span class="preview-extra-value">${escapeHtml(val)}</span></div>`).join('')}
+            </div>
+          ` : ''}
         </div>
       </div>
-      ${extraRows.length ? `
-        <div class="preview-extra">
-          ${extraRows.map(([label,val])=>`<div class="preview-extra-row"><span class="preview-extra-label">${escapeHtml(label)}</span><span class="preview-extra-value">${escapeHtml(val)}</span></div>`).join('')}
-        </div>
-      ` : ''}
       <div class="explore-actions" style="max-width:280px;">
         <button class="explore-add-btn" id="previewAddBtn">Añadir</button>
         <button class="explore-add-btn" id="previewWatchedBtn">Vista</button>
