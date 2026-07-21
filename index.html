@@ -279,16 +279,21 @@
   .detail-overview{font-size:12.5px;color:var(--text-dim);margin-top:9px;line-height:1.55;max-height:110px;overflow-y:auto;}
 
   /* ---------- VISTA PREVIA DE EXPLORAR (póster grande) ---------- */
-  .preview-hero{display:flex;gap:22px;margin-bottom:18px;}
+  .preview-hero{display:flex;gap:24px;margin-bottom:18px;}
   .preview-hero img{
-    width:230px;height:345px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#0d0d0d;
+    width:260px;height:390px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#0d0d0d;
     box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:zoom-in;transition:transform .15s;
   }
   .preview-hero img:hover{transform:scale(1.015);}
   .preview-info{display:flex;flex-direction:column;min-width:0;}
-  .preview-title{font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.25;color:var(--text);}
+  .preview-title{font-family:var(--font-display);font-weight:600;font-size:23px;line-height:1.25;color:var(--text);}
   .preview-meta{font-size:12.5px;color:var(--text-faint);margin-top:6px;font-family:var(--font-mono);}
+  .preview-tagline{font-size:12.5px;color:var(--accent);font-style:italic;margin-top:8px;}
   .preview-overview{font-size:13.5px;color:var(--text-dim);margin-top:12px;line-height:1.6;max-height:none;overflow-y:visible;}
+  .preview-extra{border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px;display:flex;flex-direction:column;gap:7px;}
+  .preview-extra-row{display:flex;gap:10px;font-size:12.5px;line-height:1.5;}
+  .preview-extra-label{flex:0 0 110px;color:var(--text-faint);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px;}
+  .preview-extra-value{flex:1;color:var(--text-dim);}
   .status-select-row{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap;}
   .status-choice{
     border:1px solid var(--border-strong);background:transparent;color:var(--text-faint);
@@ -668,8 +673,10 @@
     .detail-hero{gap:12px;}
     .detail-hero img{width:110px;height:165px;}
     .preview-hero{flex-direction:column;align-items:center;text-align:center;gap:14px;}
-    .preview-hero img{width:170px;height:255px;}
+    .preview-hero img{width:190px;height:285px;}
     .preview-info{align-items:center;}
+    .preview-extra-row{flex-direction:column;gap:2px;text-align:left;}
+    .preview-extra-label{flex:none;}
     .status-select-row{gap:8px;}
     .status-choice{padding:8px 12px;}
     .season-head{flex-wrap:wrap;row-gap:8px;padding:12px 0;}
@@ -962,7 +969,7 @@
 
 <!-- EXPLORE PREVIEW MODAL -->
 <div class="overlay hidden" id="explorePreviewOverlay">
-  <div class="modal" style="max-width:700px;">
+  <div class="modal" style="max-width:760px;">
     <div class="modal-head">
       <h2 style="visibility:hidden;">.</h2>
       <button class="close-x" data-close="explorePreviewOverlay" aria-label="Cerrar">✕</button>
@@ -1903,15 +1910,38 @@ async function openExplorePreview(it, cardEl){
   content.innerHTML = `<p class="loader-line">Cargando ficha…</p>`;
   openModal('explorePreviewOverlay');
   try{
-    const d = it.media_type === 'movie' ? await fetchMovieDetails(it.id) : await fetchTvDetails(it.id);
+    const path = it.media_type === 'movie' ? `/movie/${it.id}` : `/tv/${it.id}`;
+    const d = await tmdbFetch(path, { append_to_response: 'credits' });
     const title = it.media_type === 'movie' ? d.title : d.name;
+    const originalTitle = it.media_type === 'movie' ? d.original_title : d.original_name;
     const date = it.media_type === 'movie' ? d.release_date : d.first_air_date;
     const genres = (d.genres||[]).map(g=>g.name).join(' · ');
+
     const meta = [];
     if(date) meta.push(date.slice(0,4));
     if(it.media_type === 'movie' && d.runtime) meta.push(`${d.runtime} min`);
     if(it.media_type === 'tv' && d.number_of_seasons) meta.push(`${d.number_of_seasons} temporada(s)`);
     if(d.vote_average) meta.push(`★ ${d.vote_average.toFixed(1)}`);
+
+    const statusEs = { 'Released':'Estrenada', 'Ended':'Finalizada', 'Canceled':'Cancelada', 'Returning Series':'En emisión', 'In Production':'En producción', 'Planned':'Anunciada', 'Rumored':'Rumor', 'Post Production':'Postproducción' };
+    if(d.status) meta.push(statusEs[d.status] || d.status);
+
+    const director = it.media_type === 'movie'
+      ? (d.credits && d.credits.crew || []).find(c=>c.job==='Director')
+      : null;
+    const creators = it.media_type === 'tv' ? (d.created_by||[]).map(c=>c.name) : [];
+    const cast = (d.credits && d.credits.cast || []).slice(0,6).map(c=>c.name);
+    const countries = it.media_type === 'movie'
+      ? (d.production_countries||[]).map(c=>c.name)
+      : (d.production_countries||[]).map(c=>c.name).length ? (d.production_countries||[]).map(c=>c.name) : (d.origin_country||[]);
+
+    const extraRows = [];
+    if(director) extraRows.push(['Dirección', director.name]);
+    if(creators.length) extraRows.push(['Creación', creators.join(', ')]);
+    if(cast.length) extraRows.push(['Reparto', cast.join(', ')]);
+    if(countries.length) extraRows.push(['País', countries.join(', ')]);
+    if(originalTitle && originalTitle !== title) extraRows.push(['Título original', originalTitle]);
+
     content.innerHTML = `
       <div class="preview-hero">
         ${d.poster_path ? `<img src="${IMG_BASE}${d.poster_path}" alt="" data-lightbox="${d.poster_path}">` : ''}
@@ -1919,9 +1949,15 @@ async function openExplorePreview(it, cardEl){
           <div class="preview-title">${escapeHtml(title||'')}</div>
           <div class="preview-meta">${meta.join(' · ')}</div>
           <div class="preview-meta">${escapeHtml(genres)}</div>
+          ${d.tagline ? `<div class="preview-tagline">${escapeHtml(d.tagline)}</div>` : ''}
           <div class="preview-overview">${escapeHtml(d.overview || 'Sin sinopsis disponible.')}</div>
         </div>
       </div>
+      ${extraRows.length ? `
+        <div class="preview-extra">
+          ${extraRows.map(([label,val])=>`<div class="preview-extra-row"><span class="preview-extra-label">${escapeHtml(label)}</span><span class="preview-extra-value">${escapeHtml(val)}</span></div>`).join('')}
+        </div>
+      ` : ''}
       <div class="explore-actions" style="max-width:280px;">
         <button class="explore-add-btn" id="previewAddBtn">Añadir</button>
         <button class="explore-add-btn" id="previewWatchedBtn">Vista</button>
