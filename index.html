@@ -332,8 +332,10 @@
     position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
     background:var(--ink);border:none;color:#151515;
     padding:10px 16px;border-radius:5px;font-size:12.5px;font-weight:500;z-index:200;opacity:0;transition:opacity .2s, transform .2s;
+    display:flex;align-items:center;gap:12px;white-space:nowrap;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+  .toast-action{background:none;border:none;color:#151515;font-weight:700;text-decoration:underline;font-size:12.5px;padding:0;}
   footer{max-width:1040px;margin:10px auto 40px;padding:0 28px;font-size:10.5px;color:var(--text-faint);text-align:left;border-top:1px solid var(--border);padding-top:16px;}
 
   /* ---------- LIGHT THEME ---------- */
@@ -512,6 +514,14 @@
   .diary-date{font-family:var(--font-mono);color:var(--text-faint);flex:0 0 auto;font-size:11px;}
   .diary-info{flex:1;min-width:0;}
   .diary-note{color:var(--text-faint);font-size:11px;}
+  .diary-global-title{background:none;border:none;color:var(--text);font-weight:600;font-size:12px;padding:0;text-decoration:underline;cursor:pointer;}
+  .diary-global-title:hover{color:var(--accent);}
+  .genre-breakdown-list{display:flex;flex-wrap:wrap;gap:6px;}
+  .genre-breakdown-item{
+    font-size:11.5px;color:var(--text-dim);background:var(--card);border:1px solid var(--border);
+    border-radius:4px;padding:4px 8px;
+  }
+  .genre-breakdown-count{color:var(--text-faint);font-family:var(--font-mono);}
   .diary-del{background:none;border:none;color:var(--text-faint);font-size:13px;padding:2px 6px;}
   .diary-del:hover{color:var(--rust,#c1553a);}
   .diary-empty{font-size:12px;color:var(--text-faint);}
@@ -692,6 +702,7 @@
     .toast{
       left:16px;right:16px;transform:none;text-align:center;
       bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+      white-space:normal;justify-content:center;flex-wrap:wrap;
     }
     .toast.show{transform:translateY(-4px);}
 
@@ -726,7 +737,7 @@
 
 <main>
   <div class="toolbar-row">
-    <input type="text" class="lib-search" id="librarySearch" placeholder="Buscar en tu biblioteca… ( / )">
+    <input type="text" class="lib-search" id="librarySearch" placeholder="Buscar por título, nota o etiqueta… ( / )">
     <select class="genre-select" id="genreSelect">
       <option value="">Todos los géneros</option>
     </select>
@@ -741,6 +752,7 @@
     </select>
     <button class="view-toggle" id="viewToggleBtn">Vista lista</button>
     <button class="week-toggle" id="weekViewBtn">Vista semanal</button>
+    <button class="week-toggle" id="surpriseBtn">🎲 Sorpréndeme</button>
   </div>
 
   <div class="section-heading-row" id="sectionHeadingRow">
@@ -846,8 +858,13 @@
           <div class="stub-sub" id="statFavoritesSub">—</div>
         </div>
       </div>
-      <div style="margin-top:14px;">
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="mini-btn" id="openWrappedBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Ver tu año en Cartelera →</button>
+        <button class="mini-btn" id="openGlobalDiaryBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Ver diario completo →</button>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="detail-subhead" style="margin:0 0 8px;">Tus géneros</div>
+        <div class="genre-breakdown-list" id="genreBreakdownList"></div>
       </div>
     </div>
 
@@ -944,7 +961,7 @@
     </div>
     <div class="field">
       <label>Buscar serie o película</label>
-      <input type="text" id="searchInput" placeholder="Ej. Breaking Bad, Dune...">
+      <input type="text" id="searchInput" placeholder="Ej. Breaking Bad, Dune... o pega un enlace de themoviedb.org">
     </div>
     <div class="search-results" id="searchResults"></div>
   </div>
@@ -989,6 +1006,17 @@
     <div style="margin-top:16px;display:flex;justify-content:flex-end;">
       <button class="mini-btn" id="shareWrappedBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Compartir</button>
     </div>
+  </div>
+</div>
+
+<!-- DIARIO GLOBAL -->
+<div class="overlay hidden" id="globalDiaryOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h2>Diario</h2>
+      <button class="close-x" data-close="globalDiaryOverlay" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="globalDiaryContent"></div>
   </div>
 </div>
 
@@ -1121,11 +1149,27 @@ async function saveViewMode(mode){
 }
 
 /* ============ UTIL ============ */
+let toastTimer = null;
 function showToast(msg){
   const t = document.getElementById('toast');
+  clearTimeout(toastTimer);
+  t.innerHTML = '';
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2400);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+/** Toast con un botón de acción (p.ej. "Deshacer"), se queda más tiempo. */
+function showActionToast(msg, actionLabel, onAction){
+  const t = document.getElementById('toast');
+  clearTimeout(toastTimer);
+  t.innerHTML = `<span>${escapeHtml(msg)}</span> <button class="toast-action" id="toastActionBtn">${escapeHtml(actionLabel)}</button>`;
+  t.classList.add('show');
+  document.getElementById('toastActionBtn').addEventListener('click', ()=>{
+    clearTimeout(toastTimer);
+    t.classList.remove('show');
+    onAction();
+  });
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 6000);
 }
 function openModal(id){
   const el = document.getElementById(id);
@@ -1182,6 +1226,25 @@ function fmtDate(d){
 }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
+/** "en 3 días" / "mañana" / "hoy" / "hace 2 días", para acompañar una fecha. */
+function relativeDays(dateStr){
+  if(!dateStr) return '';
+  try{
+    const target = new Date(dateStr+'T00:00:00');
+    const today = new Date(todayISO()+'T00:00:00');
+    const diffDays = Math.round((target - today) / 86400000);
+    if(diffDays === 0) return 'hoy';
+    if(diffDays === 1) return 'mañana';
+    if(diffDays === -1) return 'ayer';
+    if(diffDays > 1) return `en ${diffDays} días`;
+    return `hace ${Math.abs(diffDays)} días`;
+  }catch(e){ return ''; }
+}
+function fmtDateRel(dateStr){
+  if(!dateStr) return '—';
+  return `${fmtDate(dateStr)} (${relativeDays(dateStr)})`;
+}
+
 /* ============ TMDB CALLS ============ */
 async function tmdbFetch(path, params={}, attempt=0){
   if(!STATE.apiKey) throw new Error('NO_KEY');
@@ -1222,6 +1285,13 @@ async function fetchSeasonEpisodes(tmdbId, seasonNumber){
 
 /* ============ ADD ITEMS ============ */
 let searchTimer = null;
+/** Reconoce enlaces de themoviedb.org tipo /movie/12345-slug o /tv/12345-slug */
+function parseTmdbUrl(text){
+  const match = /themoviedb\.org\/(movie|tv)\/(\d+)/.exec(text);
+  if(!match) return null;
+  return { media_type: match[1], id: Number(match[2]) };
+}
+
 document.getElementById('searchInput').addEventListener('input', (e)=>{
   clearTimeout(searchTimer);
   const q = e.target.value.trim();
@@ -1231,9 +1301,23 @@ document.getElementById('searchInput').addEventListener('input', (e)=>{
     box.innerHTML = `<p class="help-text">Primero configura tu clave de TMDB con el botón ⚙ de arriba.</p>`;
     return;
   }
+  const asUrl = parseTmdbUrl(q);
   searchTimer = setTimeout(async ()=>{
-    box.innerHTML = `<p class="loader-line">Buscando…</p>`;
+    box.innerHTML = `<p class="loader-line">${asUrl ? 'Cargando enlace…' : 'Buscando…'}</p>`;
     try{
+      if(asUrl){
+        const d = asUrl.media_type === 'movie' ? await fetchMovieDetails(asUrl.id) : await fetchTvDetails(asUrl.id);
+        renderSearchResults([{
+          id: asUrl.id,
+          media_type: asUrl.media_type,
+          title: asUrl.media_type === 'movie' ? d.title : undefined,
+          name: asUrl.media_type === 'tv' ? d.name : undefined,
+          poster_path: d.poster_path,
+          release_date: d.release_date,
+          first_air_date: d.first_air_date
+        }]);
+        return;
+      }
       const results = await searchMulti(q);
       renderSearchResults(results);
     }catch(err){
@@ -1485,6 +1569,7 @@ function downloadFile(filename, content, mime){
 document.getElementById('exportBackupBtn').addEventListener('click', ()=>{
   const payload = { exported_at: new Date().toISOString(), library: STATE.library };
   downloadFile(`cartelera-backup-${todayISO()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+  try{ localStorage.setItem('tvtime:lastbackup', String(Date.now())); }catch(e){}
   showToast('Copia de seguridad descargada');
 });
 document.getElementById('importBackupInput').addEventListener('change', (e)=>{
@@ -1644,6 +1729,22 @@ document.getElementById('weekViewBtn').addEventListener('click', ()=>{
   renderLibrary();
 });
 
+/* ---- sorpréndeme: elige algo al azar de Pendientes ---- */
+document.getElementById('surpriseBtn').addEventListener('click', ()=>{
+  let candidates = STATE.library.filter(i=>i.status==='watchlist');
+  if(currentGenre) candidates = candidates.filter(i=>(i.genres||[]).includes(currentGenre));
+  if(currentTag) candidates = candidates.filter(i=>(i.tags||[]).includes(currentTag));
+  if(!candidates.length){
+    showToast(currentGenre || currentTag
+      ? 'Nada en Pendientes coincide con ese filtro.'
+      : 'No tienes nada en Pendientes todavía. ¡Añade algo primero!');
+    return;
+  }
+  const pick = candidates[Math.floor(Math.random()*candidates.length)];
+  showToast(`🎲 Te toca: ${pick.title}`);
+  openDetail(pick.uid);
+});
+
 /* ---- pestañas principales: Viendo / Todo / Visto / Favoritos / Explorar ---- */
 document.getElementById('topTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.tab');
@@ -1740,7 +1841,7 @@ function renderFavoritesView(){
     items = items.filter(i=> (i.tags||[]).includes(currentTag));
   }
   if(librarySearch){
-    items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
+    items = items.filter(i=> matchesSearch(i, librarySearch));
   }
   items = sortItems(items);
   grid.innerHTML = '';
@@ -1769,7 +1870,7 @@ function renderWatchedView(){
     items = items.filter(i=> (i.tags||[]).includes(currentTag));
   }
   if(librarySearch){
-    items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
+    items = items.filter(i=> matchesSearch(i, librarySearch));
   }
   items = sortItems(items);
   grid.innerHTML = '';
@@ -1958,9 +2059,10 @@ async function openExplorePreview(it, cardEl){
           ` : ''}
         </div>
       </div>
-      <div class="explore-actions" style="max-width:280px;">
+      <div class="explore-actions" style="max-width:420px;">
         <button class="explore-add-btn" id="previewAddBtn">Añadir</button>
         <button class="explore-add-btn" id="previewWatchedBtn">Vista</button>
+        <button class="explore-add-btn" id="previewTrailerBtn">▶ Tráiler</button>
       </div>
     `;
     const previewImg = content.querySelector('[data-lightbox]');
@@ -1977,6 +2079,17 @@ async function openExplorePreview(it, cardEl){
     };
     document.getElementById('previewAddBtn').addEventListener('click', (e)=> doAdd('watchlist', e.currentTarget));
     document.getElementById('previewWatchedBtn').addEventListener('click', (e)=> doAdd('completed', e.currentTarget));
+    document.getElementById('previewTrailerBtn').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      const original = btn.textContent;
+      btn.textContent = 'Buscando…';
+      btn.disabled = true;
+      const key = await fetchTrailer(it.media_type, it.id);
+      btn.disabled = false;
+      btn.textContent = original;
+      if(key) window.open(`https://www.youtube.com/watch?v=${key}`, '_blank', 'noopener');
+      else showToast('No hemos encontrado tráiler para este título.');
+    });
   }catch(err){
     content.innerHTML = `<p class="help-text">No se pudo cargar la ficha. Revisa tu clave de API.</p>`;
   }
@@ -2247,6 +2360,7 @@ function hasFreshUnwatchedEpisode(item){
 function computeStats(){
   let totalMinutes = 0, episodesWatched = 0, moviesWatched = 0, movieMinutes = 0, watchingCount = 0;
   const genreCounts = {};
+  const genreCountsAll = {};
   let favoritesCount = 0;
   STATE.library.forEach(item=>{
     if(item.media_type === 'tv'){
@@ -2261,6 +2375,7 @@ function computeStats(){
         totalMinutes += item.runtime || 0;
       }
     }
+    (item.genres||[]).forEach(g=>{ genreCountsAll[g] = (genreCountsAll[g]||0) + 1; });
     if(item.favorite){
       favoritesCount++;
       (item.genres||[]).forEach(g=>{ genreCounts[g] = (genreCounts[g]||0) + 1; });
@@ -2283,6 +2398,14 @@ function computeStats(){
     topGenre = `${genreEntries[0][0]} es tu género favorito`;
   }
   document.getElementById('statFavoritesSub').textContent = favoritesCount ? topGenre : 'sin favoritos aún';
+
+  const breakdownList = document.getElementById('genreBreakdownList');
+  if(breakdownList){
+    const allEntries = Object.entries(genreCountsAll).sort((a,b)=>b[1]-a[1]);
+    breakdownList.innerHTML = allEntries.length
+      ? allEntries.map(([g,c])=>`<span class="genre-breakdown-item">${escapeHtml(g)} <span class="genre-breakdown-count">${c}</span></span>`).join('')
+      : `<span class="help-text" style="margin:0;">Añade algo a tu biblioteca para ver el desglose.</span>`;
+  }
 }
 
 /**
@@ -2331,6 +2454,7 @@ function computeWrapped(year){
     episodeCount, movieCount,
     titleCount: titleSet.size,
     topGenre: genreEntries[0] ? genreEntries[0][0] : null,
+    topGenres: genreEntries.slice(0,3).map(([g,c])=>`${g} (${c})`),
     bingeDay: dayEntries[0] ? { date: dayEntries[0][0], count: dayEntries[0][1] } : null,
     topRatedTitle: topRatedValue >= 4 ? topRatedTitle : null
   };
@@ -2355,6 +2479,7 @@ function renderWrapped(year){
       <div class="wrapped-stat-item"><div class="wrapped-stat-value">${data.titleCount}</div><div class="wrapped-stat-label">títulos distintos</div></div>
       <div class="wrapped-stat-item"><div class="wrapped-stat-value">${data.topGenre || '—'}</div><div class="wrapped-stat-label">género estrella</div></div>
     </div>
+    ${data.topGenres.length ? `<div class="wrapped-highlight">Tu top de géneros: <strong>${data.topGenres.map(escapeHtml).join(' · ')}</strong>.</div>` : ''}
     ${data.bingeDay ? `<div class="wrapped-highlight">Tu día más maratoniano fue el <strong>${fmtDate(data.bingeDay.date)}</strong>, con ${data.bingeDay.count} entradas de diario.</div>` : ''}
     ${data.topRatedTitle ? `<div class="wrapped-highlight">Tu joya del año: <strong>${escapeHtml(data.topRatedTitle)}</strong>.</div>` : ''}
   `;
@@ -2377,6 +2502,45 @@ document.getElementById('shareWrappedBtn').addEventListener('click', async ()=>{
   try{ await navigator.clipboard.writeText(text); showToast('Resumen copiado al portapapeles'); }
   catch(e){ showToast('No se pudo compartir ni copiar.'); }
 });
+
+document.getElementById('openGlobalDiaryBtn').addEventListener('click', ()=>{
+  closeModal('apiKeyOverlay');
+  renderGlobalDiary();
+  openModal('globalDiaryOverlay');
+});
+function renderGlobalDiary(){
+  const content = document.getElementById('globalDiaryContent');
+  const rows = [];
+  STATE.library.forEach(item=>{
+    (item.diary||[]).forEach(e=>{
+      rows.push({ date: e.date, title: item.title, uid: item.uid, label: e.label, note: e.note, synthetic: e.synthetic });
+    });
+  });
+  if(!rows.length){
+    content.innerHTML = `<p class="diary-empty">Aún no hay entradas de diario. Se registran solas al marcar episodios o pelis como vistos.</p>`;
+    return;
+  }
+  rows.sort((a,b)=> a.date < b.date ? 1 : -1);
+  content.innerHTML = `
+    <div class="diary-list" style="max-height:60vh;">
+      ${rows.map(r=>`
+        <div class="diary-row">
+          <span class="diary-date">${fmtDate(r.date)}</span>
+          <span class="diary-info">
+            <button class="diary-global-title" data-open-uid="${r.uid}">${escapeHtml(r.title)}</button>
+            — ${escapeHtml(r.label||'')}${r.note ? ` <span class="diary-note">— ${escapeHtml(r.note)}</span>` : ''}
+          </span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  content.querySelectorAll('[data-open-uid]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      closeModal('globalDiaryOverlay');
+      openDetail(btn.dataset.openUid);
+    });
+  });
+}
 
 /* ============ RENDER LIBRARY ============ */
 let homeMode = true;
@@ -2418,6 +2582,14 @@ function categoryLabel(key){
   return ({ all:'Todo', watching:'Viendo', watchlist:'Pendientes', completed:'Completadas', movie:'Películas', dropped:'Abandonadas' })[key] || 'Biblioteca';
 }
 
+/** El buscador mira título, notas y etiquetas, no solo el título. */
+function matchesSearch(item, query){
+  if(item.title.toLowerCase().includes(query)) return true;
+  if((item.notes||'').toLowerCase().includes(query)) return true;
+  if((item.tags||[]).some(t=>t.toLowerCase().includes(query))) return true;
+  return false;
+}
+
 function filteredLibrary(){
   let items;
   if(currentFilter === 'all') items = STATE.library;
@@ -2431,7 +2603,7 @@ function filteredLibrary(){
     items = items.filter(i=> (i.tags||[]).includes(currentTag));
   }
   if(librarySearch){
-    items = items.filter(i=> i.title.toLowerCase().includes(librarySearch));
+    items = items.filter(i=> matchesSearch(i, librarySearch));
   }
   return sortItems(items);
 }
@@ -2884,7 +3056,7 @@ function buildCard(item, hidePill){
     progressPct = Math.min(100, Math.round((item.watched.length/total)*100));
     metaLine = `${item.watched.length}/${total} episodios`;
     if(item.next_episode_to_air){
-      nextLine = `Próximo: T${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number} · ${fmtDate(item.next_episode_to_air.air_date)}`;
+      nextLine = `Próximo: T${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number} · ${fmtDateRel(item.next_episode_to_air.air_date)}`;
     } else if(item.tmdb_status === 'Ended' || item.tmdb_status === 'Canceled'){
       nextLine = item.tmdb_status === 'Ended' ? 'Serie finalizada' : 'Serie cancelada';
     } else {
@@ -2895,7 +3067,7 @@ function buildCard(item, hidePill){
   } else {
     progressPct = item.watched_movie ? 100 : 0;
     metaLine = item.runtime ? `${item.runtime} min` : '';
-    nextLine = item.watched_movie ? `Vista el ${fmtDate((item.watched_at||'').slice(0,10))}` : (item.release_date ? `Estreno: ${fmtDate(item.release_date)}` : '');
+    nextLine = item.watched_movie ? `Vista el ${fmtDate((item.watched_at||'').slice(0,10))}` : (item.release_date ? `Estreno: ${fmtDateRel(item.release_date)}` : '');
   }
 
   const statusLabels = { watching:'Viendo', watchlist:'Pendiente', completed:'Completada', dropped:'Abandonada' };
@@ -2947,9 +3119,16 @@ function buildCard(item, hidePill){
 
   card.querySelector('.remove-btn').addEventListener('click', async (e)=>{
     e.stopPropagation();
+    const removedIndex = STATE.library.indexOf(item);
     STATE.library = STATE.library.filter(i=>i.uid !== item.uid);
     await saveLibrary();
     renderLibrary();
+    showActionToast(`"${item.title}" eliminada`, 'Deshacer', async ()=>{
+      const idx = Math.min(removedIndex, STATE.library.length);
+      STATE.library.splice(idx, 0, item);
+      await saveLibrary();
+      renderLibrary();
+    });
   });
 
   card.querySelector('.favorite-btn').addEventListener('click', async (e)=>{
@@ -3076,6 +3255,24 @@ async function fetchProviders(mediaType, tmdbId){
     return { flatrate: [], link: null };
   }
 }
+
+const trailerCache = {};
+/** Busca un tráiler en YouTube para el título (prioriza el oficial). */
+async function fetchTrailer(mediaType, tmdbId){
+  const cacheKey = `${mediaType}:${tmdbId}`;
+  if(trailerCache[cacheKey] !== undefined) return trailerCache[cacheKey];
+  try{
+    const data = await tmdbFetch(`/${mediaType}/${tmdbId}/videos`, {});
+    const vids = data.results || [];
+    const trailers = vids.filter(v=> v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+    const best = trailers.find(v=>v.official && v.type==='Trailer') || trailers.find(v=>v.type==='Trailer') || trailers[0] || null;
+    trailerCache[cacheKey] = best ? best.key : null;
+    return trailerCache[cacheKey];
+  }catch(err){
+    trailerCache[cacheKey] = null;
+    return null;
+  }
+}
 async function loadProvidersSection(item){
   const body = document.getElementById('providersBody');
   if(!body) return;
@@ -3119,6 +3316,7 @@ function openDetail(uid){
       ${[1,2,3,4,5].map(n=>`<button class="star-btn ${ (item.rating||0) >= n ? 'filled' : '' }" data-star="${n}" aria-label="Valorar con ${n} estrella(s)">★</button>`).join('')}
       <button class="detail-favorite-btn ${item.favorite?'active':''}" id="detailFavoriteBtn" aria-pressed="${item.favorite?'true':'false'}">${item.favorite ? '♥ En favoritos' : '♡ Añadir a favoritos'}</button>
       <button class="detail-favorite-btn" id="detailSimilarBtn">🔍 Similar a esto</button>
+      <button class="detail-favorite-btn" id="detailTrailerBtn">▶ Tráiler</button>
     </div>
     <div class="notes-field">
       <textarea id="notesInput" placeholder="Notas personales (opinión, dónde lo dejaste, recomendaciones…)">${escapeHtml(item.notes||'')}</textarea>
@@ -3245,6 +3443,19 @@ function openDetail(uid){
     renderLibrary();
   });
 
+  // tráiler
+  content.querySelector('#detailTrailerBtn').addEventListener('click', async (e)=>{
+    const btn = e.currentTarget;
+    const original = btn.textContent;
+    btn.textContent = 'Buscando…';
+    btn.disabled = true;
+    const key = await fetchTrailer(item.media_type, item.tmdb_id);
+    btn.disabled = false;
+    btn.textContent = original;
+    if(key) window.open(`https://www.youtube.com/watch?v=${key}`, '_blank', 'noopener');
+    else showToast('No hemos encontrado tráiler para este título.');
+  });
+
   // notes (debounced save)
   let notesTimer = null;
   const notesEl = content.querySelector('#notesInput');
@@ -3312,7 +3523,7 @@ function openDetail(uid){
                   <div class="ep-check">✓</div>
                   <div class="ep-num">${ep.episode_number}</div>
                   <div class="ep-name">${escapeHtml(ep.name||'Episodio '+ep.episode_number)}</div>
-                  <div class="ep-date">${aired ? fmtDate(ep.air_date) : `Estreno ${fmtDate(ep.air_date)}`}</div>
+                  <div class="ep-date">${aired ? fmtDate(ep.air_date) : (ep.air_date ? relativeDays(ep.air_date) : 'Sin fecha')}</div>
                 </div>
               `;
             }).join('') || `<p class="loader-line">Sin datos de episodios.</p>`;
@@ -3510,8 +3721,36 @@ async function init(){
       syncAll(false);
     }
   }
+  checkBackupReminder();
 }
 init();
+
+/** Recordatorio suave si hace mucho que no exportas una copia (o nunca lo has hecho). */
+function checkBackupReminder(){
+  if(!STATE.library.length) return;
+  let lastBackup = 0;
+  try{ lastBackup = Number(localStorage.getItem('tvtime:lastbackup')) || 0; }catch(e){}
+  const THIRTY_DAYS = 1000*60*60*24*30;
+  if(Date.now() - lastBackup > THIRTY_DAYS){
+    setTimeout(()=>{
+      showActionToast(
+        lastBackup ? 'Hace más de un mes que no exportas una copia de seguridad.' : 'Nunca has exportado una copia de seguridad de tu biblioteca.',
+        'Ajustes',
+        ()=> document.getElementById('apiKeyBtn').click()
+      );
+    }, 1800);
+  }
+}
+
+/* ---- sincronía entre pestañas del mismo navegador ---- */
+window.addEventListener('storage', (e)=>{
+  if(e.key === 'tvtime:library'){
+    try{
+      STATE.library = e.newValue ? JSON.parse(e.newValue) : [];
+      renderLibrary();
+    }catch(err){ /* ignorar si el JSON llega a medias */ }
+  }
+});
 
 /* ============ PWA: SERVICE WORKER (best-effort) ============ */
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
