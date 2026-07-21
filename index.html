@@ -294,6 +294,23 @@
   .preview-extra-row{display:flex;gap:8px;font-size:12px;line-height:1.5;}
   .preview-extra-label{flex:0 0 88px;color:var(--text-faint);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px;}
   .preview-extra-value{flex:1;color:var(--text-dim);}
+  .modal-backdrop-strip{
+    width:100%;height:150px;background-size:cover;background-position:center 20%;
+    border-radius:8px;margin-bottom:18px;background-color:#0d0d0d;
+  }
+  .person-link{
+    background:none;border:none;color:var(--text-dim);padding:0;font:inherit;cursor:pointer;
+    text-decoration:underline;text-decoration-color:var(--border-strong);
+  }
+  .person-link:hover{color:var(--accent);text-decoration-color:var(--accent);}
+  .keyword-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;}
+  .keyword-chip{font-size:10.5px;color:var(--text-faint);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3px 8px;}
+  .collection-banner{
+    display:block;width:100%;text-align:left;margin-top:14px;background:var(--card);
+    border:1px solid var(--border-strong);border-radius:6px;padding:9px 12px;color:var(--text-dim);
+    font-size:12px;cursor:pointer;
+  }
+  .collection-banner:hover{color:var(--text);border-color:var(--accent);}
   .status-select-row{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap;}
   .status-choice{
     border:1px solid var(--border-strong);background:transparent;color:var(--text-faint);
@@ -926,6 +943,7 @@
         <button class="mini-btn" id="exportBackupBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Exportar copia (.json)</button>
         <label class="file-label" for="importBackupInput">Importar copia (.json)</label>
         <input type="file" id="importBackupInput" accept="application/json" style="display:none;">
+        <button class="mini-btn" id="exportCsvBtn" style="flex:none;border:1px solid var(--border-strong);padding:6px 12px;">Exportar a CSV</button>
       </div>
     </div>
 
@@ -1052,6 +1070,29 @@ const TV_EXPLORE_SECTIONS = [
   { key:'top_rated', label:'Mejor valoradas', path:'/tv/top_rated' },
   { key:'classics', label:'Clásicos', path:'/discover/tv', extraParams:{ sort_by:'vote_average.desc', 'vote_count.gte':'800', 'first_air_date.lte':'2005-12-31' } }
 ];
+
+/** IDs de proveedor de TMDB para las plataformas que se pueden marcar en Ajustes. */
+const PROVIDER_TMDB_IDS = {
+  'Netflix': 8, 'HBO Max': 1899, 'Amazon Prime Video': 9, 'Disney Plus': 337,
+  'Movistar Plus+': 149, 'Filmin': 63, 'SkyShowtime': 1773, 'Apple TV Plus': 350, 'Rakuten TV': 35
+};
+/** Una sección "En {plataforma}" por cada una de tus plataformas marcadas en Ajustes que TMDB reconozca. */
+function buildPlatformSections(mediaType){
+  return STATE.myProviders
+    .filter(name => PROVIDER_TMDB_IDS[name])
+    .map(name => ({
+      key: `platform-${PROVIDER_TMDB_IDS[name]}`,
+      label: `En ${name}`,
+      path: mediaType === 'movie' ? '/discover/movie' : '/discover/tv',
+      extraParams: {
+        with_watch_providers: String(PROVIDER_TMDB_IDS[name]),
+        watch_region: 'ES',
+        with_watch_monetization_types: 'flatrate',
+        sort_by: 'popularity.desc'
+      }
+    }));
+}
+
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE = 'https://image.tmdb.org/t/p/w342';
 const seasonCache = {}; // key: `${tmdb_id}-${season_number}` -> episodes array (in-memory only)
@@ -1572,6 +1613,22 @@ document.getElementById('exportBackupBtn').addEventListener('click', ()=>{
   try{ localStorage.setItem('tvtime:lastbackup', String(Date.now())); }catch(e){}
   showToast('Copia de seguridad descargada');
 });
+document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
+  if(!STATE.library.length){ showToast('Tu biblioteca está vacía todavía.'); return; }
+  const csvCell = (val)=>{
+    const s = String(val==null ? '' : val);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  };
+  const header = ['title','media_type','status','rating','favorite','genres','added_at','tags'];
+  const rows = STATE.library.map(i=>[
+    i.title, i.media_type, i.status, i.rating||0, i.favorite ? 'si' : 'no',
+    (i.genres||[]).join('|'), new Date(i.added_at||Date.now()).toISOString().slice(0,10), (i.tags||[]).join('|')
+  ].map(csvCell).join(','));
+  const csv = [header.join(','), ...rows].join('\r\n');
+  downloadFile(`cartelera-biblioteca-${todayISO()}.csv`, csv, 'text/csv');
+  try{ localStorage.setItem('tvtime:lastbackup', String(Date.now())); }catch(e){}
+  showToast('CSV descargado');
+});
 document.getElementById('importBackupInput').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -1950,6 +2007,12 @@ async function fetchExplorePage(mediaType, section, page){
   if(section.custom === 'similar'){
     return fetchSimilarPage(mediaType, section, page);
   }
+  if(section.custom === 'person'){
+    return fetchPersonPage(section.personId);
+  }
+  if(section.custom === 'collection'){
+    return fetchCollectionPage(section.collectionId);
+  }
   const params = Object.assign({ page: String(page) }, section.extraParams || {});
   const data = await tmdbFetch(section.path, params);
   const results = (data.results||[]).map(r=>({
@@ -2012,51 +2075,27 @@ async function openExplorePreview(it, cardEl){
   openModal('explorePreviewOverlay');
   try{
     const path = it.media_type === 'movie' ? `/movie/${it.id}` : `/tv/${it.id}`;
-    const d = await tmdbFetch(path, { append_to_response: 'credits' });
-    const title = it.media_type === 'movie' ? d.title : d.name;
-    const originalTitle = it.media_type === 'movie' ? d.original_title : d.original_name;
-    const date = it.media_type === 'movie' ? d.release_date : d.first_air_date;
-    const genres = (d.genres||[]).map(g=>g.name).join(' · ');
-
-    const meta = [];
-    if(date) meta.push(date.slice(0,4));
-    if(it.media_type === 'movie' && d.runtime) meta.push(`${d.runtime} min`);
-    if(it.media_type === 'tv' && d.number_of_seasons) meta.push(`${d.number_of_seasons} temporada(s)`);
-    if(d.vote_average) meta.push(`★ ${d.vote_average.toFixed(1)}`);
-
-    const statusEs = { 'Released':'Estrenada', 'Ended':'Finalizada', 'Canceled':'Cancelada', 'Returning Series':'En emisión', 'In Production':'En producción', 'Planned':'Anunciada', 'Rumored':'Rumor', 'Post Production':'Postproducción' };
-    if(d.status) meta.push(statusEs[d.status] || d.status);
-
-    const director = it.media_type === 'movie'
-      ? (d.credits && d.credits.crew || []).find(c=>c.job==='Director')
-      : null;
-    const creators = it.media_type === 'tv' ? (d.created_by||[]).map(c=>c.name) : [];
-    const cast = (d.credits && d.credits.cast || []).slice(0,6).map(c=>c.name);
-    const countries = it.media_type === 'movie'
-      ? (d.production_countries||[]).map(c=>c.name)
-      : (d.production_countries||[]).map(c=>c.name).length ? (d.production_countries||[]).map(c=>c.name) : (d.origin_country||[]);
-
-    const extraRows = [];
-    if(director) extraRows.push(['Dirección', director.name]);
-    if(creators.length) extraRows.push(['Creación', creators.join(', ')]);
-    if(cast.length) extraRows.push(['Reparto', cast.join(', ')]);
-    if(countries.length) extraRows.push(['País', countries.join(', ')]);
-    if(originalTitle && originalTitle !== title) extraRows.push(['Título original', originalTitle]);
+    const append = it.media_type === 'movie' ? 'credits,release_dates,keywords' : 'credits,content_ratings,keywords';
+    const d = await tmdbFetch(path, { append_to_response: append });
+    const info = buildRichDetailInfo(d, it.media_type);
 
     content.innerHTML = `
+      ${info.backdrop_path ? `<div class="modal-backdrop-strip" style="background-image:url(${IMG_BASE.replace('w342','w780')}${info.backdrop_path})"></div>` : ''}
       <div class="preview-hero">
         ${d.poster_path ? `<img src="${IMG_BASE}${d.poster_path}" alt="" data-lightbox="${d.poster_path}">` : ''}
         <div class="preview-info">
-          <div class="preview-title">${escapeHtml(title||'')}</div>
-          <div class="preview-meta">${meta.join(' · ')}</div>
-          <div class="preview-meta">${escapeHtml(genres)}</div>
+          <div class="preview-title">${escapeHtml(info.title||'')}</div>
+          <div class="preview-meta">${info.meta.join(' · ')}</div>
+          <div class="preview-meta">${escapeHtml(info.genres)}</div>
           ${d.tagline ? `<div class="preview-tagline">${escapeHtml(d.tagline)}</div>` : ''}
           <div class="preview-overview">${escapeHtml(d.overview || 'Sin sinopsis disponible.')}</div>
-          ${extraRows.length ? `
+          ${info.extraRows.length ? `
             <div class="preview-extra">
-              ${extraRows.map(([label,val])=>`<div class="preview-extra-row"><span class="preview-extra-label">${escapeHtml(label)}</span><span class="preview-extra-value">${escapeHtml(val)}</span></div>`).join('')}
+              ${info.extraRows.map(([label,val])=>`<div class="preview-extra-row"><span class="preview-extra-label">${escapeHtml(label)}</span><span class="preview-extra-value">${val}</span></div>`).join('')}
             </div>
           ` : ''}
+          ${info.keywords.length ? `<div class="keyword-row">${info.keywords.map(k=>`<span class="keyword-chip">#${escapeHtml(k.name)}</span>`).join('')}</div>` : ''}
+          ${info.collection ? `<button class="collection-banner" id="previewCollectionBtn">🎬 Pertenece a la colección "${escapeHtml(info.collection.name)}" — ver todas →</button>` : ''}
         </div>
       </div>
       <div class="explore-actions" style="max-width:420px;">
@@ -2067,6 +2106,10 @@ async function openExplorePreview(it, cardEl){
     `;
     const previewImg = content.querySelector('[data-lightbox]');
     if(previewImg) previewImg.addEventListener('click', ()=> openImageLightbox(previewImg.dataset.lightbox));
+    wirePersonLinks(content);
+    if(info.collection){
+      document.getElementById('previewCollectionBtn').addEventListener('click', ()=> enterCollectionDrill(info.collection.id, info.collection.name));
+    }
     const doAdd = async (status, btn)=>{
       btn.disabled = true;
       btn.textContent = status === 'completed' ? 'Marcando…' : 'Añadiendo…';
@@ -2160,7 +2203,8 @@ async function renderExploreView(){
   }
   typeTabs.classList.remove('hidden');
 
-  const allSections = exploreMediaType === 'movie' ? MOVIE_EXPLORE_SECTIONS : TV_EXPLORE_SECTIONS;
+  const baseSections = exploreMediaType === 'movie' ? MOVIE_EXPLORE_SECTIONS : TV_EXPLORE_SECTIONS;
+  const allSections = [...baseSections, ...buildPlatformSections(exploreMediaType)];
   const sections = allSections.filter(s => s.custom !== 'recommended' || getRecommendationSeeds(exploreMediaType).length > 0);
   container.innerHTML = sections.map(s=>`
     <div class="explore-section">
@@ -2245,7 +2289,7 @@ async function renderExploreDrillScreen(){
   container.innerHTML = `
     <div class="explore-drill-head">
       <button class="back-home-btn" id="exploreDrillBack">← Volver</button>
-      <h3>${escapeHtml(section.label)} · ${mediaType === 'movie' ? 'Películas' : 'Series'}</h3>
+      <h3>${escapeHtml(section.label)}${mediaType === 'multi' ? '' : ` · ${mediaType === 'movie' ? 'Películas' : 'Series'}`}</h3>
     </div>
     <div class="grid explore-drill-grid" id="exploreDrillGrid"><p class="loader-line">Cargando…</p></div>
   `;
@@ -2460,6 +2504,29 @@ function computeWrapped(year){
   };
 }
 
+function computeWrappedProgress(year){
+  const now = new Date();
+  const cutoff = `${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  function minutesUpToCutoff(y){
+    let minutes = 0;
+    STATE.library.forEach(item=>{
+      (item.diary||[]).forEach(e=>{
+        if(!e.date || !e.date.startsWith(String(y))) return;
+        const mmdd = e.date.slice(5);
+        if(mmdd > cutoff) return;
+        if(item.media_type === 'movie') minutes += item.runtime || 0;
+        else minutes += item.episode_run_time || 40;
+      });
+    });
+    return minutes;
+  }
+  const thisYearMin = minutesUpToCutoff(year);
+  const lastYearMin = minutesUpToCutoff(year-1);
+  if(lastYearMin <= 0) return null;
+  const pct = Math.round(((thisYearMin - lastYearMin) / lastYearMin) * 100);
+  return { pct, thisYearHours: Math.round(thisYearMin/60), lastYearHours: Math.round(lastYearMin/60) };
+}
+
 function renderWrapped(year){
   const data = computeWrapped(year);
   document.getElementById('wrappedTitle').textContent = `Tu ${year} en Cartelera`;
@@ -2468,6 +2535,7 @@ function renderWrapped(year){
     content.innerHTML = `<p class="wrapped-empty">Todavía no hay entradas de diario de ${year}. Marca episodios o pelis como vistos y vuelve más adelante.</p>`;
     return;
   }
+  const progress = year === new Date().getFullYear() ? computeWrappedProgress(year) : null;
   content.innerHTML = `
     <div class="wrapped-hero">
       <div class="wrapped-year">${year}</div>
@@ -2482,6 +2550,7 @@ function renderWrapped(year){
     ${data.topGenres.length ? `<div class="wrapped-highlight">Tu top de géneros: <strong>${data.topGenres.map(escapeHtml).join(' · ')}</strong>.</div>` : ''}
     ${data.bingeDay ? `<div class="wrapped-highlight">Tu día más maratoniano fue el <strong>${fmtDate(data.bingeDay.date)}</strong>, con ${data.bingeDay.count} entradas de diario.</div>` : ''}
     ${data.topRatedTitle ? `<div class="wrapped-highlight">Tu joya del año: <strong>${escapeHtml(data.topRatedTitle)}</strong>.</div>` : ''}
+    ${progress ? `<div class="wrapped-highlight">Vas <strong>${progress.pct >= 0 ? `un ${progress.pct}% por delante` : `un ${Math.abs(progress.pct)}% por detrás`}</strong> del año pasado a estas alturas (${progress.thisYearHours}h vs ${progress.lastYearHours}h).</div>` : ''}
   `;
 }
 
@@ -3273,6 +3342,120 @@ async function fetchTrailer(mediaType, tmdbId){
     return null;
   }
 }
+
+const STATUS_ES = { 'Released':'Estrenada', 'Ended':'Finalizada', 'Canceled':'Cancelada', 'Returning Series':'En emisión', 'In Production':'En producción', 'Planned':'Anunciada', 'Rumored':'Rumor', 'Post Production':'Postproducción' };
+const personLinkChip = (p)=> `<button class="person-link" data-person-id="${p.id}" data-person-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</button>`;
+
+/** Construye meta/reparto/país/certificación/keywords a partir de una respuesta completa de TMDB (con credits + release_dates/content_ratings + keywords). Se reutiliza tanto en la vista previa de Explorar como en el detalle de tu biblioteca. */
+function buildRichDetailInfo(d, mediaType){
+  const title = mediaType === 'movie' ? d.title : d.name;
+  const originalTitle = mediaType === 'movie' ? d.original_title : d.original_name;
+  const date = mediaType === 'movie' ? d.release_date : d.first_air_date;
+  const genres = (d.genres||[]).map(g=>g.name).join(' · ');
+
+  const meta = [];
+  if(date) meta.push(date.slice(0,4));
+  if(mediaType === 'movie' && d.runtime) meta.push(`${d.runtime} min`);
+  if(mediaType === 'tv' && d.number_of_seasons) meta.push(`${d.number_of_seasons} temporada(s)`);
+  if(d.vote_average) meta.push(`★ ${d.vote_average.toFixed(1)}${d.vote_count ? ` (${d.vote_count.toLocaleString('es-ES')})` : ''}`);
+  if(d.status) meta.push(STATUS_ES[d.status] || d.status);
+
+  let certification = null;
+  try{
+    if(mediaType === 'movie' && d.release_dates && d.release_dates.results){
+      const region = d.release_dates.results.find(r=>r.iso_3166_1==='ES') || d.release_dates.results.find(r=>r.iso_3166_1==='US');
+      const withCert = region && (region.release_dates||[]).find(rd=>rd.certification);
+      if(withCert) certification = withCert.certification;
+    } else if(mediaType === 'tv' && d.content_ratings && d.content_ratings.results){
+      const region = d.content_ratings.results.find(r=>r.iso_3166_1==='ES') || d.content_ratings.results.find(r=>r.iso_3166_1==='US');
+      if(region && region.rating) certification = region.rating;
+    }
+  }catch(e){ /* si TMDB no trae el dato, seguimos sin certificación */ }
+  if(certification) meta.push(`🔞 ${certification}`);
+
+  const director = mediaType === 'movie' ? (d.credits && d.credits.crew || []).find(c=>c.job==='Director') : null;
+  const creators = mediaType === 'tv' ? (d.created_by||[]) : [];
+  const cast = (d.credits && d.credits.cast || []).slice(0,6);
+  const countriesArr = (d.production_countries||[]).map(c=>c.name);
+  const countries = countriesArr.length ? countriesArr : (d.origin_country||[]);
+
+  const extraRows = [];
+  if(director) extraRows.push(['Dirección', personLinkChip(director)]);
+  if(creators.length) extraRows.push(['Creación', creators.map(personLinkChip).join(', ')]);
+  if(cast.length) extraRows.push(['Reparto', cast.map(personLinkChip).join(', ')]);
+  if(countries.length) extraRows.push(['País', escapeHtml(countries.join(', '))]);
+  if(originalTitle && originalTitle !== title) extraRows.push(['Título original', escapeHtml(originalTitle)]);
+
+  const keywordsRaw = mediaType === 'movie' ? (d.keywords && d.keywords.keywords) : (d.keywords && d.keywords.results);
+  const keywords = (keywordsRaw||[]).slice(0,8);
+
+  return { title, originalTitle, date, genres, meta, extraRows, keywords, collection: mediaType === 'movie' ? d.belongs_to_collection : null, backdrop_path: d.backdrop_path };
+}
+
+/** Conecta los nombres de reparto/dirección de un contenedor para abrir su filmografía en Explorar. */
+function wirePersonLinks(container){
+  container.querySelectorAll('[data-person-id]').forEach(btn=>{
+    btn.addEventListener('click', ()=> enterPersonFilmography(Number(btn.dataset.personId), btn.dataset.personName));
+  });
+}
+function enterPersonFilmography(personId, personName){
+  const section = { key:`person-${personId}`, label:`Filmografía de ${personName}`, custom:'person', personId };
+  weekViewActive = false; watchedViewActive = false; favoritesViewActive = false;
+  exploreViewActive = true;
+  exploreDrill = { mediaType: 'multi', section };
+  closeModal('detailOverlay');
+  closeModal('explorePreviewOverlay');
+  renderLibrary();
+}
+async function fetchPersonPage(personId){
+  try{
+    const data = await tmdbFetch(`/person/${personId}/combined_credits`, {});
+    const items = [...(data.cast||[]), ...(data.crew||[]).filter(c=>c.job==='Director'||c.job==='Creator')];
+    const seen = new Set();
+    const mapped = [];
+    items.forEach(r=>{
+      if(r.media_type !== 'movie' && r.media_type !== 'tv') return;
+      const key = `${r.media_type}-${r.id}`;
+      if(seen.has(key)) return;
+      seen.add(key);
+      mapped.push({
+        id: r.id, media_type: r.media_type,
+        title: r.media_type === 'movie' ? r.title : r.name,
+        date: r.media_type === 'movie' ? r.release_date : r.first_air_date,
+        poster_path: r.poster_path, vote_average: r.vote_average
+      });
+    });
+    mapped.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    return { results: mapped, totalPages: 1 };
+  }catch(err){
+    return { results: [], totalPages: 1 };
+  }
+}
+
+/** Ver el resto de una saga/colección de una peli. */
+function enterCollectionDrill(collectionId, collectionName){
+  const section = { key:`collection-${collectionId}`, label:`Colección: ${collectionName}`, custom:'collection', collectionId };
+  weekViewActive = false; watchedViewActive = false; favoritesViewActive = false;
+  exploreViewActive = true;
+  exploreMediaType = 'movie';
+  document.querySelectorAll('#exploreTypeTabs .tab').forEach(t=> t.classList.toggle('active', t.dataset.media==='movie'));
+  exploreDrill = { mediaType: 'movie', section };
+  closeModal('detailOverlay');
+  closeModal('explorePreviewOverlay');
+  renderLibrary();
+}
+async function fetchCollectionPage(collectionId){
+  try{
+    const data = await tmdbFetch(`/collection/${collectionId}`, {});
+    const mapped = (data.parts||[]).map(r=>({
+      id: r.id, media_type: 'movie', title: r.title, date: r.release_date, poster_path: r.poster_path, vote_average: r.vote_average
+    })).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    return { results: mapped, totalPages: 1 };
+  }catch(err){
+    return { results: [], totalPages: 1 };
+  }
+}
+
 async function loadProvidersSection(item){
   const body = document.getElementById('providersBody');
   if(!body) return;
@@ -3293,6 +3476,46 @@ async function loadProvidersSection(item){
   }
 }
 
+const creditsCache = {};
+/** Carga fondo, reparto/dirección clicables, país, keywords y colección para un item ya en tu biblioteca. */
+async function loadCreditsSection(item){
+  const extraField = document.getElementById('detailExtraField');
+  const keywordRow = document.getElementById('detailKeywordRow');
+  const backdropStrip = document.getElementById('detailBackdropStrip');
+  const collectionBtn = document.getElementById('detailCollectionBtn');
+  if(!extraField) return;
+  try{
+    const cacheKey = `${item.media_type}:${item.tmdb_id}`;
+    let info = creditsCache[cacheKey];
+    if(!info){
+      const path = item.media_type === 'movie' ? `/movie/${item.tmdb_id}` : `/tv/${item.tmdb_id}`;
+      const append = item.media_type === 'movie' ? 'credits,release_dates,keywords' : 'credits,content_ratings,keywords';
+      const d = await tmdbFetch(path, { append_to_response: append });
+      info = buildRichDetailInfo(d, item.media_type);
+      creditsCache[cacheKey] = info;
+    }
+    if(info.backdrop_path && backdropStrip){
+      backdropStrip.style.backgroundImage = `url(${IMG_BASE.replace('w342','w780')}${info.backdrop_path})`;
+      backdropStrip.classList.remove('hidden');
+    }
+    if(info.extraRows.length){
+      extraField.innerHTML = info.extraRows.map(([label,val])=>`<div class="preview-extra-row"><span class="preview-extra-label">${escapeHtml(label)}</span><span class="preview-extra-value">${val}</span></div>`).join('');
+      extraField.classList.remove('hidden');
+      wirePersonLinks(extraField);
+    }
+    if(info.keywords.length && keywordRow){
+      keywordRow.innerHTML = info.keywords.map(k=>`<span class="keyword-chip">#${escapeHtml(k.name)}</span>`).join('');
+    }
+    if(info.collection && collectionBtn){
+      collectionBtn.textContent = `🎬 Pertenece a la colección "${info.collection.name}" — ver todas →`;
+      collectionBtn.classList.remove('hidden');
+      collectionBtn.addEventListener('click', ()=> enterCollectionDrill(info.collection.id, info.collection.name));
+    }
+  }catch(err){
+    // si TMDB falla aquí, el resto del detalle sigue funcionando con normalidad
+  }
+}
+
 function openDetail(uid){
   const item = STATE.library.find(i=>i.uid===uid);
   if(!item) return;
@@ -3301,14 +3524,18 @@ function openDetail(uid){
   const statusLabels = { watching:'Viendo', watchlist:'Pendiente', completed:'Completada', dropped:'Abandonada' };
 
   let html = `
+    <div class="modal-backdrop-strip hidden" id="detailBackdropStrip"></div>
     <div class="detail-hero">
       ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="" data-lightbox="${item.poster_path}" style="cursor:zoom-in;">` : `<div class="poster-placeholder" style="width:96px;height:144px;border-radius:8px;background:#0c0e15;"></div>`}
       <div>
         <div class="detail-title">${escapeHtml(item.title)}</div>
         <div class="detail-meta">${(item.genres||[]).join(' · ') || '—'}</div>
         <div class="detail-overview">${escapeHtml(item.overview || 'Sin sinopsis disponible.')}</div>
+        <div class="preview-extra hidden" id="detailExtraField"></div>
+        <div class="keyword-row" id="detailKeywordRow"></div>
       </div>
     </div>
+    <button class="collection-banner hidden" id="detailCollectionBtn"></button>
     <div class="status-select-row" id="statusRow">
       ${Object.entries(statusLabels).map(([k,v])=>`<button class="status-choice ${item.status===k?'active':''}" data-status="${k}">${v}</button>`).join('')}
     </div>
@@ -3342,10 +3569,6 @@ function openDetail(uid){
       <div class="diary-list" id="diaryList"></div>
     </div>
   `;
-
-  renderDiarySection(item);
-  renderTagsSection(item);
-  loadProvidersSection(item);
 
   if(item.media_type === 'tv'){
     html += `<div id="seasonsWrap">`;
@@ -3385,6 +3608,11 @@ function openDetail(uid){
   document.getElementById('detailContent').querySelector('h2') || null;
   document.querySelector('#detailOverlay .modal-head h2').textContent = item.title;
   document.querySelector('#detailOverlay .modal-head h2').style.visibility = 'visible';
+
+  renderDiarySection(item);
+  renderTagsSection(item);
+  loadProvidersSection(item);
+  loadCreditsSection(item);
 
   const detailImg = content.querySelector('[data-lightbox]');
   if(detailImg) detailImg.addEventListener('click', ()=> openImageLightbox(detailImg.dataset.lightbox));
