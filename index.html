@@ -480,7 +480,7 @@
   .explore-card .ec-title{font-size:12px;font-weight:600;margin-top:7px;line-height:1.3;}
   .explore-card .ec-meta{font-size:10.5px;color:var(--text-faint);font-family:var(--font-mono);margin-top:2px;}
   .explore-card .ec-because{font-size:10px;color:var(--accent);margin-top:4px;line-height:1.3;font-style:italic;}
-  .explore-actions{display:flex;gap:6px;margin-top:7px;}
+  .explore-actions{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
   .explore-add-btn{
     flex:1;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
     border-radius:5px;padding:6px 0;font-size:11px;font-weight:500;
@@ -976,6 +976,18 @@
     </div>
 
     <div class="settings-section">
+      <h3>Comparar con un amigo</h3>
+      <p class="help-text" style="margin-top:0;">
+        Pide a esa persona que exporte su copia (.json) desde su propia Cartelera y súbela aquí. Se compara solo en tu navegador,
+        de un solo uso — no se guarda ni se envía a ningún sitio.
+      </p>
+      <div class="settings-row">
+        <label class="file-label" for="compareFileInput">Subir copia de un amigo</label>
+        <input type="file" id="compareFileInput" accept="application/json" style="display:none;">
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h3>Calendario de estrenos</h3>
       <p class="help-text" style="margin-top:0;">Descarga un archivo .ics con los próximos episodios y estrenos de tu biblioteca para importarlo en tu calendario.</p>
       <div class="settings-row">
@@ -1063,6 +1075,17 @@
       <button class="close-x" data-close="globalDiaryOverlay" aria-label="Cerrar">✕</button>
     </div>
     <div id="globalDiaryContent"></div>
+  </div>
+</div>
+
+<!-- COMPARAR CON UN AMIGO -->
+<div class="overlay hidden" id="compareOverlay">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <h2>Comparar con un amigo</h2>
+      <button class="close-x" data-close="compareOverlay" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="compareContent"></div>
   </div>
 </div>
 
@@ -1894,6 +1917,23 @@ document.getElementById('favoritesRatingFilter').addEventListener('change', (e)=
   renderFavoritesView();
 });
 
+/** Comparte el enlace público de TMDB de un título (móvil: menú nativo; escritorio: copia al portapapeles). */
+async function shareTitleLink(mediaType, tmdbId, title){
+  const url = `https://www.themoviedb.org/${mediaType}/${tmdbId}`;
+  const text = `Mira esto: ${title}`;
+  if(navigator.share){
+    try{ await navigator.share({ title, text, url }); }
+    catch(e){ /* el usuario canceló el share, no pasa nada */ }
+    return;
+  }
+  try{
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    showToast('Enlace copiado al portapapeles');
+  }catch(e){
+    showToast('No se pudo compartir ni copiar el enlace.');
+  }
+}
+
 async function shareFavorites(){
   const items = sortItems(STATE.library.filter(i=>i.favorite));
   if(!items.length){ showToast('Aún no tienes favoritos que compartir.'); return; }
@@ -2132,10 +2172,11 @@ async function openExplorePreview(it, cardEl){
           ${info.collection ? `<button class="collection-banner" id="previewCollectionBtn">🎬 Pertenece a la colección "${escapeHtml(info.collection.name)}" — ver todas →</button>` : ''}
         </div>
       </div>
-      <div class="explore-actions" style="max-width:420px;">
+      <div class="explore-actions" style="max-width:520px;">
         <button class="explore-add-btn" id="previewAddBtn">Añadir</button>
         <button class="explore-add-btn" id="previewWatchedBtn">Vista</button>
         <button class="explore-add-btn" id="previewTrailerBtn">▶ Tráiler</button>
+        <button class="explore-add-btn" id="previewShareBtn">📤 Compartir</button>
       </div>
     `;
     const previewImg = content.querySelector('[data-lightbox]');
@@ -2168,6 +2209,9 @@ async function openExplorePreview(it, cardEl){
       btn.textContent = original;
       if(key) window.open(`https://www.youtube.com/watch?v=${key}`, '_blank', 'noopener');
       else showToast('No hemos encontrado tráiler para este título.');
+    });
+    document.getElementById('previewShareBtn').addEventListener('click', ()=>{
+      shareTitleLink(it.media_type, it.id, info.title);
     });
   }catch(err){
     content.innerHTML = `<p class="help-text">No se pudo cargar la ficha. Revisa tu clave de API.</p>`;
@@ -2646,6 +2690,96 @@ function renderGlobalDiary(){
     });
   });
 }
+
+/* ---- comparar con un amigo (sin servidor: se compara en memoria, no se guarda) ---- */
+function matchKeyFor(i){ return i.tmdb_id ? `${i.tmdb_id}:${i.media_type}` : `title:${(i.title||'').toLowerCase()}`; }
+function libraryGenreSet(lib){
+  const set = new Set();
+  lib.forEach(i => (i.genres||[]).forEach(g=>set.add(g)));
+  return set;
+}
+function computeComparison(friendLibrary){
+  const myLib = STATE.library;
+  const myMap = new Map(myLib.map(i=>[matchKeyFor(i), i]));
+  const friendMap = new Map(friendLibrary.map(i=>[matchKeyFor(i), i]));
+
+  const commonWatched = [];
+  const bothPending = [];
+  myMap.forEach((mine, key)=>{
+    const theirs = friendMap.get(key);
+    if(!theirs) return;
+    const mineDone = mine.media_type === 'movie' ? !!mine.watched_movie : mine.status === 'completed';
+    const theirsDone = theirs.media_type === 'movie' ? !!theirs.watched_movie : theirs.status === 'completed';
+    if(mineDone && theirsDone) commonWatched.push(mine);
+    if(mine.status === 'watchlist' && theirs.status === 'watchlist') bothPending.push(mine);
+  });
+
+  const friendGenreCounts = {};
+  friendLibrary.forEach(i => (i.genres||[]).forEach(g=>{ friendGenreCounts[g] = (friendGenreCounts[g]||0) + 1; }));
+  const friendTopGenres = Object.entries(friendGenreCounts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([g])=>g);
+  const suggestionsForFriend = myLib.filter(i=>{
+    if(friendMap.has(matchKeyFor(i))) return false;
+    return (i.genres||[]).some(g=>friendTopGenres.includes(g));
+  }).slice(0,8);
+
+  const myGenres = libraryGenreSet(myLib);
+  const friendGenres = libraryGenreSet(friendLibrary);
+  const shared = [...myGenres].filter(g=>friendGenres.has(g));
+  const union = new Set([...myGenres, ...friendGenres]);
+  const compatibility = union.size ? Math.round((shared.length/union.size)*100) : 0;
+
+  return { commonWatched, bothPending, suggestionsForFriend, compatibility, sharedGenres: shared };
+}
+function renderComparison(friendLibrary){
+  const content = document.getElementById('compareContent');
+  const data = computeComparison(friendLibrary);
+  const posterThumb = (item)=> item.poster_path
+    ? `<img src="${IMG_BASE}${item.poster_path}" alt="" style="width:36px;height:54px;object-fit:cover;border-radius:3px;flex-shrink:0;">`
+    : `<div style="width:36px;height:54px;background:#0d0d0d;border-radius:3px;flex-shrink:0;"></div>`;
+  const rowList = (items, emptyMsg)=> items.length ? items.map(i=>`
+    <div class="diary-row">
+      ${posterThumb(i)}
+      <span class="diary-info">${escapeHtml(i.title)}</span>
+    </div>
+  `).join('') : `<p class="help-text" style="margin:6px 0 0;">${emptyMsg}</p>`;
+
+  content.innerHTML = `
+    <div class="wrapped-highlight">
+      Compatibilidad de gustos: <strong>${data.compatibility}%</strong>
+      ${data.sharedGenres.length ? ` — géneros en común: ${data.sharedGenres.slice(0,5).map(escapeHtml).join(', ')}` : ''}
+    </div>
+
+    <div class="detail-subhead">Ya habéis visto los dos (${data.commonWatched.length})</div>
+    <div class="diary-list" style="max-height:160px;">${rowList(data.commonWatched, 'Nada en común todavía por aquí.')}</div>
+
+    <div class="detail-subhead">Podríais ver juntos ya mismo (${data.bothPending.length})</div>
+    <div class="diary-list" style="max-height:160px;">${rowList(data.bothPending, 'Ninguno de vuestros Pendientes coincide.')}</div>
+
+    <div class="detail-subhead">Le recomendarías de tus Pendientes (${data.suggestionsForFriend.length})</div>
+    <div class="diary-list" style="max-height:160px;">${rowList(data.suggestionsForFriend, 'Nada que encaje con sus gustos habituales.')}</div>
+
+    <p class="help-text" style="margin-top:14px;">Esta comparación no se ha guardado en ningún sitio — se ha hecho solo en tu navegador y desaparece al cerrar esta ventana.</p>
+  `;
+}
+document.getElementById('compareFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      const friendLibrary = Array.isArray(data) ? data : data.library;
+      if(!Array.isArray(friendLibrary)) throw new Error('formato inválido');
+      closeModal('apiKeyOverlay');
+      renderComparison(friendLibrary);
+      openModal('compareOverlay');
+    }catch(err){
+      showToast('El archivo no tiene un formato válido. Tiene que ser un .json exportado desde Cartelera.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
 
 /* ============ RENDER LIBRARY ============ */
 let homeMode = true;
@@ -3580,6 +3714,7 @@ function openDetail(uid){
       <button class="detail-favorite-btn ${item.favorite?'active':''}" id="detailFavoriteBtn" aria-pressed="${item.favorite?'true':'false'}">${item.favorite ? '♥ En favoritos' : '♡ Añadir a favoritos'}</button>
       <button class="detail-favorite-btn" id="detailSimilarBtn">🔍 Similar a esto</button>
       <button class="detail-favorite-btn" id="detailTrailerBtn">▶ Tráiler</button>
+      <button class="detail-favorite-btn" id="detailShareBtn">📤 Compartir</button>
     </div>
     <div class="notes-field">
       <textarea id="notesInput" placeholder="Notas personales (opinión, dónde lo dejaste, recomendaciones…)">${escapeHtml(item.notes||'')}</textarea>
@@ -3718,6 +3853,10 @@ function openDetail(uid){
     btn.textContent = original;
     if(key) window.open(`https://www.youtube.com/watch?v=${key}`, '_blank', 'noopener');
     else showToast('No hemos encontrado tráiler para este título.');
+  });
+
+  content.querySelector('#detailShareBtn').addEventListener('click', ()=>{
+    shareTitleLink(item.media_type, item.tmdb_id, item.title);
   });
 
   // notes (debounced save)
