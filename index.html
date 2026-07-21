@@ -261,8 +261,11 @@
   }
   .result-row img{width:36px;height:54px;object-fit:cover;border-radius:3px;background:#0d0d0d;flex-shrink:0;}
   .result-poster-ph{width:36px;height:54px;border-radius:3px;background:#0d0d0d;flex-shrink:0;}
+  .result-preview{cursor:pointer;flex-shrink:0;}
   .result-info{flex:1;min-width:0;}
   .result-title{font-size:13px;font-weight:500;}
+  .result-title[data-preview]{cursor:pointer;}
+  .result-title[data-preview]:hover{text-decoration:underline;}
   .result-meta{font-size:11px;color:var(--text-faint);font-family:var(--font-mono);}
   .result-add{
     background:none;border:1px solid var(--border-strong);color:var(--text-dim);
@@ -1388,13 +1391,19 @@ function renderSearchResults(results){
     const row = document.createElement('div');
     row.className = 'result-row';
     row.innerHTML = `
-      ${r.poster_path ? `<img src="${IMG_BASE}${r.poster_path}" alt="">` : `<div class="result-poster-ph"></div>`}
+      <div class="result-preview" data-preview tabindex="0" role="button" aria-label="Ver ficha de ${escapeHtml(title||'')}">
+        ${r.poster_path ? `<img src="${IMG_BASE}${r.poster_path}" alt="">` : `<div class="result-poster-ph"></div>`}
+      </div>
       <div class="result-info">
-        <div class="result-title">${escapeHtml(title||'Sin título')}</div>
+        <div class="result-title" data-preview tabindex="0" role="button">${escapeHtml(title||'Sin título')}</div>
         <div class="result-meta">${r.media_type === 'tv' ? 'Serie' : 'Película'} · ${year}</div>
       </div>
       <button class="result-add" ${already ? 'disabled' : ''}>${already ? 'Añadida' : 'Añadir'}</button>
     `;
+    row.querySelectorAll('[data-preview]').forEach(el=>{
+      el.addEventListener('click', ()=> openExplorePreview(r, row));
+      el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openExplorePreview(r, row); } });
+    });
     row.querySelector('.result-add').addEventListener('click', async (ev)=>{
       ev.target.disabled = true; ev.target.textContent = 'Añadiendo…';
       await addItem(r);
@@ -2116,8 +2125,10 @@ async function openExplorePreview(it, cardEl){
       await addItem({ id: it.id, media_type: it.media_type }, status);
       closeModal('explorePreviewOverlay');
       if(cardEl){
+        const parent = cardEl.parentElement;
+        const isExploreCard = cardEl.classList.contains('explore-card');
         cardEl.remove();
-        if(cardEl.parentElement) maybeShowExploreEmptyMessage(cardEl.parentElement);
+        if(isExploreCard && parent) maybeShowExploreEmptyMessage(parent);
       }
     };
     document.getElementById('previewAddBtn').addEventListener('click', (e)=> doAdd('watchlist', e.currentTarget));
