@@ -148,7 +148,9 @@
     display:flex; position:relative;
   }
   .card-body{flex:1;min-width:0;display:flex;flex-direction:column;}
-  .poster-wrap{position:relative;aspect-ratio:2/3;background:#0d0d0d;overflow:hidden;border-radius:3px;}
+  .poster-wrap{position:relative;aspect-ratio:2/3;background:#0d0d0d;overflow:hidden;border-radius:3px;cursor:pointer;}
+  .card-title[data-open-detail]{cursor:pointer;}
+  .card-title[data-open-detail]:hover{text-decoration:underline;}
   .poster-wrap img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.92);}
   .poster-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-family:var(--font-display);font-size:12px;text-align:center;padding:10px;border:1px solid var(--border);}
   .type-badge{
@@ -918,6 +920,17 @@
       <button class="close-x" data-close="detailOverlay" aria-label="Cerrar detalle">✕</button>
     </div>
     <div id="detailContent"></div>
+  </div>
+</div>
+
+<!-- EXPLORE PREVIEW MODAL -->
+<div class="overlay hidden" id="explorePreviewOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h2 style="visibility:hidden;">.</h2>
+      <button class="close-x" data-close="explorePreviewOverlay" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="explorePreviewContent"></div>
   </div>
 </div>
 
@@ -1839,13 +1852,61 @@ async function fetchNextExplorePage(cacheKey){
   }
 }
 
+async function openExplorePreview(it, cardEl){
+  const content = document.getElementById('explorePreviewContent');
+  content.innerHTML = `<p class="loader-line">Cargando ficha…</p>`;
+  openModal('explorePreviewOverlay');
+  try{
+    const d = it.media_type === 'movie' ? await fetchMovieDetails(it.id) : await fetchTvDetails(it.id);
+    const title = it.media_type === 'movie' ? d.title : d.name;
+    const date = it.media_type === 'movie' ? d.release_date : d.first_air_date;
+    const genres = (d.genres||[]).map(g=>g.name).join(' · ');
+    const meta = [];
+    if(date) meta.push(date.slice(0,4));
+    if(it.media_type === 'movie' && d.runtime) meta.push(`${d.runtime} min`);
+    if(it.media_type === 'tv' && d.number_of_seasons) meta.push(`${d.number_of_seasons} temporada(s)`);
+    if(d.vote_average) meta.push(`★ ${d.vote_average.toFixed(1)}`);
+    content.innerHTML = `
+      <div class="detail-hero">
+        ${d.poster_path ? `<img src="${IMG_BASE}${d.poster_path}" alt="">` : ''}
+        <div>
+          <div class="detail-title">${escapeHtml(title||'')}</div>
+          <div class="detail-meta">${meta.join(' · ')}</div>
+          <div class="detail-meta">${escapeHtml(genres)}</div>
+          <div class="detail-overview">${escapeHtml(d.overview || 'Sin sinopsis disponible.')}</div>
+        </div>
+      </div>
+      <div class="explore-actions" style="max-width:280px;">
+        <button class="explore-add-btn" id="previewAddBtn">Añadir</button>
+        <button class="explore-add-btn" id="previewWatchedBtn">Vista</button>
+      </div>
+    `;
+    const doAdd = async (status, btn)=>{
+      btn.disabled = true;
+      btn.textContent = status === 'completed' ? 'Marcando…' : 'Añadiendo…';
+      await addItem({ id: it.id, media_type: it.media_type }, status);
+      closeModal('explorePreviewOverlay');
+      if(cardEl){
+        cardEl.remove();
+        if(cardEl.parentElement) maybeShowExploreEmptyMessage(cardEl.parentElement);
+      }
+    };
+    document.getElementById('previewAddBtn').addEventListener('click', (e)=> doAdd('watchlist', e.currentTarget));
+    document.getElementById('previewWatchedBtn').addEventListener('click', (e)=> doAdd('completed', e.currentTarget));
+  }catch(err){
+    content.innerHTML = `<p class="help-text">No se pudo cargar la ficha. Revisa tu clave de API.</p>`;
+  }
+}
+
 function buildExploreCardEl(it){
   const year = it.date ? it.date.slice(0,4) : 's/f';
   const div = document.createElement('div');
   div.className = 'explore-card';
   div.innerHTML = `
-    ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:100%;aspect-ratio:2/3;background:#0d0d0d;border-radius:3px;"></div>`}
-    <div class="ec-title">${escapeHtml(it.title||'')}</div>
+    <div data-preview tabindex="0" role="button" aria-label="Ver ficha de ${escapeHtml(it.title||'')}">
+      ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:100%;aspect-ratio:2/3;background:#0d0d0d;border-radius:3px;"></div>`}
+      <div class="ec-title">${escapeHtml(it.title||'')}</div>
+    </div>
     <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
     ${it.becauseOf ? `<div class="ec-because">Porque viste ${escapeHtml(it.becauseOf)}</div>` : ''}
     <div class="explore-actions">
@@ -1853,6 +1914,10 @@ function buildExploreCardEl(it){
       <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>
     </div>
   `;
+  const previewEl = div.querySelector('[data-preview]');
+  previewEl.style.cursor = 'pointer';
+  previewEl.addEventListener('click', ()=> openExplorePreview(it, div));
+  previewEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openExplorePreview(it, div); } });
   wireExploreCard(div);
   return div;
 }
@@ -2765,7 +2830,7 @@ function buildCard(item, hidePill){
 
   card.innerHTML = `
     <div class="card-body">
-      <div class="poster-wrap">
+      <div class="poster-wrap" data-open-detail tabindex="0" role="button" aria-label="Ver detalle de ${escapeHtml(item.title)}">
         <div class="type-badge ${item.media_type}">${item.media_type==='tv'?'Serie':'Peli'}</div>
         ${isFresh ? `<div class="new-badge">Nuevo</div>` : ''}
         <button class="remove-btn" title="Quitar" aria-label="Quitar de la biblioteca">✕</button>
@@ -2774,7 +2839,7 @@ function buildCard(item, hidePill){
       </div>
       <div class="progress-track"><div class="progress-fill" style="width:${progressPct}%"></div></div>
       <div class="card-info">
-        <div class="card-title">${escapeHtml(item.title)}</div>
+        <div class="card-title" data-open-detail role="button" tabindex="0" aria-label="Ver detalle de ${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
         <div class="card-meta">${metaLine}</div>
         ${hidePill ? '' : `<span class="status-pill status-${item.status}">${statusLabels[item.status]}</span>`}
         <div class="next-ep"><span>${nextLine}</span></div>
@@ -2785,6 +2850,16 @@ function buildCard(item, hidePill){
       </div>
     </div>
   `;
+
+  card.querySelectorAll('[data-open-detail]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openDetail(item.uid);
+    });
+    el.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(item.uid); }
+    });
+  });
 
   card.querySelector('.remove-btn').addEventListener('click', async (e)=>{
     e.stopPropagation();
