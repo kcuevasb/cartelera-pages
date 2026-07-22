@@ -964,11 +964,15 @@
       <h3>Tus plataformas</h3>
       <p class="help-text" style="margin-top:0;">Márcalas para poder filtrar tus Pendientes por lo que ya puedes ver ahora mismo.</p>
       <div class="platform-check-grid" id="platformCheckGrid">
-        ${['Netflix','HBO Max','Amazon Prime Video','Disney Plus','Movistar Plus+','Filmin','SkyShowtime','Apple TV Plus','Rakuten TV'].map(p=>`
-          <label class="platform-check-item">
-            <input type="checkbox" value="${p}" class="my-platform-check"> ${p}
-          </label>
-        `).join('')}
+        <label class="platform-check-item"><input type="checkbox" value="Netflix" class="my-platform-check"> Netflix</label>
+        <label class="platform-check-item"><input type="checkbox" value="HBO Max" class="my-platform-check"> HBO Max</label>
+        <label class="platform-check-item"><input type="checkbox" value="Amazon Prime Video" class="my-platform-check"> Amazon Prime Video</label>
+        <label class="platform-check-item"><input type="checkbox" value="Disney Plus" class="my-platform-check"> Disney Plus</label>
+        <label class="platform-check-item"><input type="checkbox" value="Movistar Plus+" class="my-platform-check"> Movistar Plus+</label>
+        <label class="platform-check-item"><input type="checkbox" value="Filmin" class="my-platform-check"> Filmin</label>
+        <label class="platform-check-item"><input type="checkbox" value="SkyShowtime" class="my-platform-check"> SkyShowtime</label>
+        <label class="platform-check-item"><input type="checkbox" value="Apple TV Plus" class="my-platform-check"> Apple TV Plus</label>
+        <label class="platform-check-item"><input type="checkbox" value="Rakuten TV" class="my-platform-check"> Rakuten TV</label>
       </div>
     </div>
 
@@ -1168,7 +1172,7 @@ const seasonCache = {}; // key: `${tmdb_id}-${season_number}` -> episodes array 
 // Cambia esto por la URL real de tu backend cuando lo despliegues en Render.
 const BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'http://localhost:8080'
-  : 'https://TU-BACKEND.onrender.com'; // TODO: sustituir por la URL real de Render
+  : 'https://cartelera-app.onrender.com'; // TODO: sustituir por la URL real de Render
 
 /**
  * Envoltorio de fetch hacia el backend: siempre manda la cookie de sesión
