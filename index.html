@@ -1540,6 +1540,18 @@ function escapeHtml(str){
 
 async function addItem(result, forcedStatus, silent){
   try{
+    // control de duplicados centralizado: pase lo que pase por delante
+    // (búsqueda, Explorar, enlace pegado, CSV), aquí se corta si el título
+    // ya está en la biblioteca — antes solo la búsqueda normal lo comprobaba
+    // (desactivando el botón), pero Explorar no, y podía crear una entrada
+    // repetida con el mismo identificador.
+    const prospectiveUid = `${result.media_type === 'tv' ? 'tv' : 'movie'}-${result.id}`;
+    const existing = STATE.library.find(i=> i.uid === prospectiveUid);
+    if(existing){
+      if(!silent) showToast(`Ya está en tu biblioteca (${categoryLabel(existing.status)}).`);
+      return;
+    }
+
     if(result.media_type === 'tv'){
       const d = await fetchTvDetails(result.id);
       const item = {
@@ -2311,6 +2323,8 @@ function buildExploreCardEl(it){
   const year = it.date ? it.date.slice(0,4) : 's/f';
   const div = document.createElement('div');
   div.className = 'explore-card';
+  const uid = `${it.media_type === 'tv' ? 'tv' : 'movie'}-${it.id}`;
+  const already = STATE.library.some(i=>i.uid === uid);
   div.innerHTML = `
     <div data-preview tabindex="0" role="button" aria-label="Ver ficha de ${escapeHtml(it.title||'')}">
       ${it.poster_path ? `<img src="${IMG_BASE}${it.poster_path}" alt="">` : `<div style="width:100%;aspect-ratio:2/3;background:#0d0d0d;border-radius:3px;"></div>`}
@@ -2319,8 +2333,8 @@ function buildExploreCardEl(it){
     <div class="ec-meta">${year}${it.vote_average ? ' · ★ '+it.vote_average.toFixed(1) : ''}</div>
     ${it.becauseOf ? `<div class="ec-because">Porque viste ${escapeHtml(it.becauseOf)}</div>` : ''}
     <div class="explore-actions">
-      <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="watchlist">Añadir</button>
-      <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>
+      <button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="watchlist" ${already?'disabled':''}>${already?'Ya añadida':'Añadir'}</button>
+      ${already ? '' : `<button class="explore-add-btn" data-explore-id="${it.id}" data-explore-type="${it.media_type}" data-explore-status="completed">Vista</button>`}
     </div>
   `;
   const previewEl = div.querySelector('[data-preview]');
