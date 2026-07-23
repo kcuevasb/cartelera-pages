@@ -366,17 +366,27 @@
       background:none;font-size:12.5px;font-weight:500;
     }
     .season-head-left{display:flex;align-items:center;gap:10px;}
-    .season-progress-mini{width:50px;height:2px;background:rgba(255,255,255,.08);overflow:hidden;}
+    .season-progress-mini{width:50px;height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;}
     .season-progress-mini div{height:100%;background:var(--accent);}
     .season-toggle{background:none;border:none;color:var(--text-faint);font-size:14px;}
     .episodes-list{padding:0 0 10px;display:none;}
     .episodes-list.open{display:block;}
-    .ep-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+    .ep-row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--border);font-size:12px;border-radius:4px;transition:background .1s;}
     .ep-row:last-child{border-bottom:none;}
-    .ep-check{
-      width:14px;height:14px;border-radius:3px;border:1px solid var(--border-strong);flex-shrink:0;
-      display:flex;align-items:center;justify-content:center;font-size:9px;color:transparent;
+    .ep-row:not(.unaired):hover{background:rgba(255,255,255,.04);}
+    /* El episodio pendiente inmediato se resalta para que no haya que
+       buscarlo entre la lista — antes había que abrir cada temporada a
+       mano y localizarlo visualmente entre todos los demás, iguales. */
+    .ep-row.next-up{background:rgba(var(--accent-rgb,184,146,90),.1);border-left:2px solid var(--accent);padding-left:4px;}
+    .ep-next-tag{
+      font-size:9px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--accent);
+      border:1px solid var(--accent);border-radius:3px;padding:1px 5px;flex-shrink:0;
     }
+    .ep-check{
+      width:20px;height:20px;border-radius:5px;border:1px solid var(--border-strong);flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:background .1s, border-color .1s;
+    }
+    .ep-row:not(.unaired):not(.watched):hover .ep-check{border-color:var(--accent);}
     .ep-row.watched .ep-check{background:var(--accent);border-color:var(--accent);color:#151515;}
     .ep-row.watched{color:var(--text-faint);}
     .ep-row.unaired{opacity:.5;cursor:not-allowed;}
@@ -385,7 +395,7 @@
     .ep-num{color:var(--text-faint);font-family:var(--font-mono);width:20px;flex-shrink:0;}
     .ep-name{flex:1;min-width:0;}
     .ep-date{color:var(--text-faint);font-family:var(--font-mono);font-size:10.5px;flex-shrink:0;}
-    .season-mark-all{background:none;border:none;color:var(--text-faint);padding:3px 0;font-size:10.5px;text-decoration:underline;}
+    .season-mark-all{background:none;border:none;color:var(--text-faint);padding:5px 2px;font-size:10.5px;text-decoration:underline;}
     .season-mark-all:hover{color:var(--text);}
     .loader-line{font-size:12px;color:var(--text-faint);padding:10px 0;font-family:var(--font-mono);}
     .toast{
@@ -3699,6 +3709,11 @@
     if(countEl) countEl.textContent = `${watchedInSeason}/${season.episode_count}`;
     const barEl = block.querySelector('.season-progress-mini div');
     if(barEl) barEl.style.width = `${season.episode_count ? (watchedInSeason/season.episode_count*100) : 0}%`;
+    const markAllBtn = block.querySelector('[data-season-mark]');
+    if(markAllBtn && !markAllBtn.disabled){
+      const seasonComplete = season.episode_count > 0 && watchedInSeason === season.episode_count;
+      markAllBtn.textContent = seasonComplete ? 'Desmarcar todos' : 'Marcar todos';
+    }
   }
 
   function renderTagsSection(item){
@@ -4013,6 +4028,7 @@
       html += `<div id="seasonsWrap">`;
       [...item.seasons].sort((a,b)=>a.season_number-b.season_number).forEach(s=>{
         const watchedInSeason = item.watched.filter(c=>c.startsWith(`S${s.season_number}E`)).length;
+        const seasonComplete = s.episode_count > 0 && watchedInSeason === s.episode_count;
         html += `
         <div class="season-block" data-season="${s.season_number}">
           <div class="season-head">
@@ -4022,7 +4038,7 @@
               <div class="season-progress-mini"><div style="width:${s.episode_count? (watchedInSeason/s.episode_count*100):0}%"></div></div>
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-              <button class="season-mark-all" data-season-mark="${s.season_number}">Marcar todos</button>
+              <button class="season-mark-all" data-season-mark="${s.season_number}">${seasonComplete ? 'Desmarcar todos' : 'Marcar todos'}</button>
               <button class="season-toggle" data-season-toggle="${s.season_number}" aria-label="Mostrar episodios de la temporada ${s.season_number}">▾</button>
             </div>
           </div>
@@ -4201,6 +4217,7 @@
     });
 
     if(item.media_type === 'tv'){
+      const nextUp = nextUnwatchedEpisode(item);
       content.querySelectorAll('[data-season-toggle]').forEach(btn=>{
         btn.addEventListener('click', async ()=>{
           const sn = btn.dataset.seasonToggle;
@@ -4213,20 +4230,27 @@
             try{
               const eps = await fetchSeasonEpisodes(item.tmdb_id, sn);
               const today = todayISO();
+              const isNextUpSeason = nextUp && String(nextUp.season_number) === String(sn);
               list.innerHTML = eps.map(ep=>{
                 const code = `S${sn}E${ep.episode_number}`;
                 const watched = item.watched.includes(code);
                 const aired = !ep.air_date || ep.air_date <= today;
+                const isNextUp = nextUp && nextUp.code === code;
                 return `
-                <div class="ep-row ${watched?'watched':''} ${aired?'':'unaired'}" data-code="${code}" data-air-date="${ep.air_date||''}">
+                <div class="ep-row ${watched?'watched':''} ${aired?'':'unaired'} ${isNextUp?'next-up':''}" data-code="${code}" data-air-date="${ep.air_date||''}">
                   <div class="ep-check">✓</div>
                   <div class="ep-num">${ep.episode_number}</div>
                   <div class="ep-name">${escapeHtml(ep.name||'Episodio '+ep.episode_number)}</div>
+                  ${isNextUp ? `<span class="ep-next-tag">Siguiente</span>` : ''}
                   <div class="ep-date">${aired ? fmtDate(ep.air_date) : (ep.air_date ? relativeDays(ep.air_date) : 'Sin fecha')}</div>
                 </div>
               `;
               }).join('') || `<p class="loader-line">Sin datos de episodios.</p>`;
               list.dataset.loaded = '1';
+              if(isNextUpSeason){
+                const nextUpRow = list.querySelector('.ep-row.next-up');
+                if(nextUpRow) nextUpRow.scrollIntoView({block:'nearest'});
+              }
               list.querySelectorAll('.ep-row').forEach(row=>{
                 row.addEventListener('click', async ()=>{
                   const code = row.dataset.code;
@@ -4262,10 +4286,17 @@
           const sn = Number(btn.dataset.seasonMark);
           const season = item.seasons.find(s=>s.season_number===sn);
           if(!season) return;
+          // El propio texto del botón dice qué va a hacer ("Marcar todos" /
+          // "Desmarcar todos") — antes siempre marcaba, así que en una
+          // temporada ya completa se quedaba como un botón sin ningún efecto.
+          const isUnmarking = btn.textContent.trim() === 'Desmarcar todos';
           btn.disabled = true;
-          const original = btn.textContent;
-          btn.textContent = 'Comprobando…';
+          btn.textContent = isUnmarking ? 'Desmarcando…' : 'Comprobando…';
           let skipped = 0, marked = 0;
+          if(isUnmarking){
+            for(let ep=1; ep<=season.episode_count; ep++){ markEpisode(item, sn, ep, false); }
+            marked = season.episode_count;
+          } else {
           try{
             const eps = await fetchSeasonEpisodes(item.tmdb_id, sn);
             const today = todayISO();
@@ -4283,19 +4314,31 @@
               else { skipped++; }
             }
           }
+          }
           if(item.status === 'watchlist' && marked>0) item.status = 'watching';
           await saveLibraryItem(item);
           renderLibrary();
+          btn.disabled = false;
+          // refreshSeasonHeader recalcula la etiqueta a partir del recuento
+          // real de episodios marcados — no simplemente "lo contrario de lo
+          // que hice", porque si algún episodio no se pudo marcar (aún no
+          // emitido), la temporada podría seguir incompleta.
           refreshSeasonHeader(item, sn);
           const list = document.getElementById(`episodes-${sn}`);
           if(list && list.dataset.loaded){
-            list.querySelectorAll('.ep-row:not(.unaired)').forEach(row=> row.classList.add('watched'));
+            list.querySelectorAll('.ep-row:not(.unaired)').forEach(row=> row.classList.toggle('watched', !isUnmarking));
           }
-          btn.disabled = false;
-          btn.textContent = original;
           if(skipped>0) showToast(`Marcados ${marked}. ${skipped} episodio(s) aún no emitido(s), no se han marcado.`);
         });
       });
+      // Auto-expandir la temporada del próximo episodio pendiente: antes
+      // había que abrir cada temporada a mano y buscarlo entre la lista.
+      // Con bibliotecas de series largas (5+ temporadas) esto ahorra varios
+      // clics cada vez que se abre el detalle.
+      if(nextUp){
+        const nextUpToggleBtn = content.querySelector(`[data-season-toggle="${nextUp.season_number}"]`);
+        if(nextUpToggleBtn) nextUpToggleBtn.click();
+      }
     } else {
       const cb = content.querySelector('#movieWatchedCheck');
       cb.addEventListener('change', async ()=>{
