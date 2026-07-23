@@ -4237,7 +4237,9 @@
               const eps = await fetchSeasonEpisodes(item.tmdb_id, sn);
               const today = todayISO();
               const isNextUpSeason = nextUp && String(nextUp.season_number) === String(sn);
-              list.innerHTML = eps.map(ep=>{
+              // Igual que las temporadas: el episodio más reciente (el
+              // último) primero, en vez de tener que bajar toda la lista.
+              list.innerHTML = [...eps].reverse().map(ep=>{
                 const code = `S${sn}E${ep.episode_number}`;
                 const watched = item.watched.includes(code);
                 const aired = !ep.air_date || ep.air_date <= today;
