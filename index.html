@@ -65,6 +65,7 @@
       display:flex;align-items:center;gap:6px;transition:color .12s, border-color .12s;
     }
     .icon-btn:hover{color:var(--text);border-color:var(--border-strong);}
+    .icon-btn:disabled{opacity:.5;cursor:not-allowed;}
     .btn-primary{
       background:var(--ink);color:#151515;border:none;border-radius:6px;
       padding:8px 14px;font-weight:600;font-size:12.5px;letter-spacing:.1px;
@@ -4339,70 +4340,97 @@
     }
   }
 
+  // Evita lanzar dos sincronizaciones a la vez (p.ej. doble clic mientras el
+  // backend está "despertando" en Render free — un cold start puede tardar
+  // 30-50s, y sin este guard un segundo clic dispara OTRO syncAll() entero
+  // en paralelo, duplicando la carga justo cuando el servidor va más lento).
+  let syncInProgress = false;
+
   async function syncAll(showFeedback){
+    if(syncInProgress){
+      if(showFeedback) showToast('Ya hay una sincronización en curso…');
+      return;
+    }
     const tvItems = STATE.library.filter(i=>i.media_type==='tv');
     if(!tvItems.length){ if(showFeedback) showToast('Nada que sincronizar todavía.'); return; }
-    if(showFeedback) showToast('Sincronizando con TMDB…');
-    document.getElementById('syncBtn').style.opacity = '.5';
-    let ok = 0;
-    const revived = [];
-    const notifiable = [];
-    // Antes: un await + sleep(120ms) por serie, 100% secuencial (≥12s de
-    // solo sleeps en una biblioteca de 100 series). Ahora: lotes en
-    // paralelo (SYNC_BATCH_SIZE a la vez) con una pausa corta ENTRE lotes,
-    // no por cada item — sigue siendo suave con el rate-limit de TMDB pero
-    // muchísimo más rápido en bibliotecas grandes.
-    const SYNC_BATCH_SIZE = 5;
-    for(let i=0; i<tvItems.length; i+=SYNC_BATCH_SIZE){
-      const batch = tvItems.slice(i, i+SYNC_BATCH_SIZE);
-      const results = await Promise.all(batch.map(item=> syncItem(item)));
-      batch.forEach((item, idx)=>{
-        const result = results[idx];
-        if(result.ok) ok++;
-        if(result.revived) revived.push(result.revived);
-        item.last_synced = Date.now();
+    syncInProgress = true;
+    const syncBtn = document.getElementById('syncBtn');
+    syncBtn.disabled = true;
+    const originalBtnText = syncBtn.textContent;
+    try{
+      // Aviso explícito del cold start: sin esto, 30-50s sin ningún cambio en
+      // pantalla parecen un fallo silencioso, no "está tardando por el hosting".
+      if(showFeedback) showToast('Sincronizando con TMDB… (el servidor puede tardar si estaba dormido)');
+      let ok = 0;
+      const revived = [];
+      const notifiable = [];
+      // Antes: un await + sleep(120ms) por serie, 100% secuencial (≥12s de
+      // solo sleeps en una biblioteca de 100 series). Ahora: lotes en
+      // paralelo (SYNC_BATCH_SIZE a la vez) con una pausa corta ENTRE lotes,
+      // no por cada item — sigue siendo suave con el rate-limit de TMDB pero
+      // muchísimo más rápido en bibliotecas grandes.
+      const SYNC_BATCH_SIZE = 5;
+      for(let i=0; i<tvItems.length; i+=SYNC_BATCH_SIZE){
+        const batch = tvItems.slice(i, i+SYNC_BATCH_SIZE);
+        // Progreso real en el propio botón: con un cold start de Render de
+        // hasta 30-50s, "Sincronizar" a secas sin cambios visibles durante
+        // tanto rato parece congelado. Esto confirma que sigue avanzando.
+        syncBtn.textContent = `Sincronizando ${Math.min(i+SYNC_BATCH_SIZE, tvItems.length)}/${tvItems.length}…`;
+        const results = await Promise.all(batch.map(item=> syncItem(item)));
+        batch.forEach((item, idx)=>{
+          const result = results[idx];
+          if(result.ok) ok++;
+          if(result.revived) revived.push(result.revived);
+          item.last_synced = Date.now();
 
-        if(hasFreshUnwatchedEpisode(item)){
-          const code = `S${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number}`;
-          if(item.last_notified_episode !== code){
-            notifiable.push({ item, code });
+          if(hasFreshUnwatchedEpisode(item)){
+            const code = `S${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number}`;
+            if(item.last_notified_episode !== code){
+              notifiable.push({ item, code });
+            }
           }
+        });
+        if(i+SYNC_BATCH_SIZE < tvItems.length){
+          await new Promise(r=>setTimeout(r, 200)); // pausa entre lotes, no por item
         }
-      });
-      if(i+SYNC_BATCH_SIZE < tvItems.length){
-        await new Promise(r=>setTimeout(r, 200)); // pausa entre lotes, no por item
       }
-    }
-    document.getElementById('syncBtn').style.opacity = '1';
 
-    if(notifiable.length && 'Notification' in window && Notification.permission === 'granted'){
-      if(notifiable.length === 1){
-        const { item } = notifiable[0];
-        new Notification('Episodio nuevo en Cartelera', {
-          body: `${item.title} · T${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number} ya disponible`
-        });
-      } else {
-        new Notification('Episodios nuevos en Cartelera', {
-          body: notifiable.map(n=>n.item.title).join(', ')
-        });
+      if(notifiable.length && 'Notification' in window && Notification.permission === 'granted'){
+        if(notifiable.length === 1){
+          const { item } = notifiable[0];
+          new Notification('Episodio nuevo en Cartelera', {
+            body: `${item.title} · T${item.next_episode_to_air.season_number}E${item.next_episode_to_air.episode_number} ya disponible`
+          });
+        } else {
+          new Notification('Episodios nuevos en Cartelera', {
+            body: notifiable.map(n=>n.item.title).join(', ')
+          });
+        }
       }
-    }
-    notifiable.forEach(({item, code})=>{ item.last_notified_episode = code; });
+      notifiable.forEach(({item, code})=>{ item.last_notified_episode = code; });
 
-    await saveLibrary();
-    renderLibrary();
-    updateSyncNote();
-    if(revived.length){
-      showToast(revived.length === 1
-              ? `¡${revived[0]} ha vuelto! Tenías esta favorita marcada como terminada.`
-              : `¡Han vuelto ${revived.length} de tus favoritas terminadas: ${revived.join(', ')}!`);
-    } else if(showFeedback){
-      showToast(`Sincronizado: ${ok}/${tvItems.length} series actualizadas`);
-    } else if(ok < tvItems.length){
-      // sync automática silenciosa (al abrir la app): no molestamos con un
-      // toast si todo fue bien, pero si algo falló de verdad sí conviene
-      // que el usuario se entere en vez de quedar en silencio total.
-      showToast(`Aviso: ${tvItems.length - ok} serie(s) no se pudieron sincronizar en segundo plano.`);
+      await saveLibrary();
+      renderLibrary();
+      updateSyncNote();
+      if(revived.length){
+        showToast(revived.length === 1
+                ? `¡${revived[0]} ha vuelto! Tenías esta favorita marcada como terminada.`
+                : `¡Han vuelto ${revived.length} de tus favoritas terminadas: ${revived.join(', ')}!`);
+      } else if(showFeedback){
+        showToast(`Sincronizado: ${ok}/${tvItems.length} series actualizadas`);
+      } else if(ok < tvItems.length){
+        // sync automática silenciosa (al abrir la app): no molestamos con un
+        // toast si todo fue bien, pero si algo falló de verdad sí conviene
+        // que el usuario se entere en vez de quedar en silencio total.
+        showToast(`Aviso: ${tvItems.length - ok} serie(s) no se pudieron sincronizar en segundo plano.`);
+      }
+    } finally {
+      // Pase lo que pase (éxito, error inesperado...) el botón siempre
+      // vuelve a quedar usable — si no, un fallo a mitad de sync dejaría
+      // "Sincronizar" bloqueado para siempre hasta recargar la página.
+      syncBtn.disabled = false;
+      syncBtn.textContent = originalBtnText;
+      syncInProgress = false;
     }
   }
 
