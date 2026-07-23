@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cartelera-v2';
+const CACHE_NAME = 'cartelera-v3'; // bump: purga cualquier respuesta /api/** que hubiera quedado cacheada
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -18,13 +18,23 @@ self.addEventListener('activate', (event) => {
 });
 
 // Network-first: siempre intenta traer la versión más reciente del servidor;
-// solo si no hay conexión, cae a la última copia guardada en caché. Así no
-// hace falta acordarse de subir de versión este archivo cada vez que se
-// actualiza la web (que era justo el problema que teníamos antes).
+// solo si no hay conexión, cae a la última copia guardada en caché para el
+// app shell (mismo origen: index.html, manifest...). Así no hace falta
+// acordarse de subir de versión este archivo cada vez que se actualiza la web.
+//
+// Nunca se cachea nada de la API del backend (biblioteca, ajustes, auth,
+// csrf, proxy TMDB), sea cual sea su origen — ni siquiera como fallback
+// offline. Bug corregido: la exclusión previa solo comprobaba dominios TMDB
+// literales (api.themoviedb.org/image.tmdb.org), de una versión anterior de
+// la app sin backend. Como ahora TMDB se llama vía proxy del backend
+// (`${BACKEND_URL}/api/tmdb/**`), esas URLs no matcheaban esa exclusión y
+// podían acabar cacheadas junto con /api/library, /api/auth/me y
+// /api/settings, con riesgo real de servir biblioteca o sesión obsoleta.
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
-  if (url.includes('api.themoviedb.org') || url.includes('image.tmdb.org')) {
-    return; // estas van siempre directas a la red
+  const requestUrl = new URL(event.request.url);
+  const isSameOrigin = requestUrl.origin === self.location.origin;
+  if (!isSameOrigin || requestUrl.pathname.startsWith('/api/')) {
+    return; // network passthrough: nunca cachear nada de la API
   }
   if (event.request.method !== 'GET') return;
 
