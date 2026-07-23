@@ -1,5 +1,8 @@
 const CACHE_NAME = 'cartelera-v3'; // bump: purga cualquier respuesta /api/** que hubiera quedado cacheada
-const APP_SHELL = ['./', './index.html', './manifest.webmanifest'];
+const APP_SHELL = [
+  './', './index.html', './manifest.webmanifest', './offline.html',
+  './icon-192.png', './icon-512.png', './icon-maskable-512.png'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -47,6 +50,16 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        // Última red de seguridad: si es una navegación (el usuario abriendo
+        // o recargando la página) y no hay ni red ni copia en caché,
+        // mostramos una pantalla de "sin conexión" en vez del error nativo
+        // del navegador.
+        if (event.request.mode === 'navigate') {
+          return caches.match('./offline.html');
+        }
+        return undefined;
+      }))
   );
 });

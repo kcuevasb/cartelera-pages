@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#121212">
   <meta name="description" content="Tu diario privado de seguimiento de series y películas.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1110,7 +1111,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
   /* ============ STATE ============ */
@@ -1260,7 +1261,8 @@
     try{
       const libRes = await apiRequest('/api/library');
       if(libRes.ok) STATE.library = await libRes.json();
-    }catch(e){ console.error('Error cargando biblioteca', e); }
+      else showToast('No se pudo cargar tu biblioteca. Comprueba tu conexión y recarga la página.');
+    }catch(e){ console.error('Error cargando biblioteca', e); showToast('No se pudo cargar tu biblioteca. Comprueba tu conexión y recarga la página.'); }
 
     try{
       const setRes = await apiRequest('/api/settings');
@@ -1274,7 +1276,7 @@
           try{ STATE.myProviders = JSON.parse(settings.myproviders); }catch(e){ STATE.myProviders = []; }
         }
       }
-    }catch(e){ console.error('Error cargando ajustes', e); }
+    }catch(e){ console.error('Error cargando ajustes', e); showToast('No se pudieron cargar tus ajustes; se usarán los valores por defecto.'); }
 
     migrateLibraryDataModel();
     document.documentElement.setAttribute('data-theme', STATE.theme);
@@ -1335,7 +1337,7 @@
     try{
       const res = await apiRequest(`/api/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value }) });
       if(!res.ok) throw new Error('HTTP_'+res.status);
-    }catch(e){ console.error(`Error guardando el ajuste "${key}"`, e); }
+    }catch(e){ console.error(`Error guardando el ajuste "${key}"`, e); showToast('No se pudo guardar el ajuste. Comprueba tu conexión.'); }
   }
   async function saveTheme(theme){
     STATE.theme = theme;
@@ -1382,8 +1384,17 @@
     });
     toastTimer = setTimeout(()=>t.classList.remove('show'), 6000);
   }
+  let lastFocusedBeforeModal = null;
+
+  function getFocusableElements(container){
+    return Array.from(container.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(el => el.offsetParent !== null); // solo los visibles de verdad
+  }
+
   function openModal(id){
     const el = document.getElementById(id);
+    lastFocusedBeforeModal = document.activeElement;
     el.classList.remove('hidden');
     el.setAttribute('aria-hidden','false');
     const focusable = el.querySelector('input, textarea, button, select');
@@ -1393,6 +1404,12 @@
     const el = document.getElementById(id);
     el.classList.add('hidden');
     el.setAttribute('aria-hidden','true');
+    // devuelve el foco a lo que lo abrió — importante para quien navega
+    // solo con teclado, si no el foco "desaparece" al cerrar el modal.
+    if(lastFocusedBeforeModal && document.contains(lastFocusedBeforeModal)){
+      lastFocusedBeforeModal.focus();
+    }
+    lastFocusedBeforeModal = null;
   }
 
   /** Abre el póster a pantalla completa usando la imagen en máxima calidad de TMDB. */
@@ -1410,7 +1427,7 @@
     o.setAttribute('role','dialog');
     o.setAttribute('aria-modal','true');
     o.setAttribute('aria-hidden','true');
-    o.addEventListener('click', (e)=>{ if(e.target===o){ o.classList.add('hidden'); o.setAttribute('aria-hidden','true'); } });
+    o.addEventListener('click', (e)=>{ if(e.target===o){ closeModal(o.id); } });
   });
 
   /* ---- keyboard shortcuts ---- */
@@ -1421,11 +1438,26 @@
       e.preventDefault();
       document.getElementById('librarySearch').focus();
     }
-    if(e.key === 'Escape'){
-      document.querySelectorAll('.overlay:not(.hidden)').forEach(o=>{
-        o.classList.add('hidden');
-        o.setAttribute('aria-hidden','true');
-      });
+    const openOverlay = document.querySelector('.overlay:not(.hidden)');
+    if(e.key === 'Escape' && openOverlay){
+      document.querySelectorAll('.overlay:not(.hidden)').forEach(o=> closeModal(o.id));
+    }
+    // focus trap: dentro de un modal abierto, Tab/Shift+Tab no debe poder
+    // sacar el foco fuera de él (si no, un usuario de teclado acaba en la
+    // barra de direcciones o en elementos "detrás" del modal, invisibles
+    // pero técnicamente alcanzables).
+    if(e.key === 'Tab' && openOverlay){
+      const focusable = getFocusableElements(openOverlay);
+      if(!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if(e.shiftKey && document.activeElement === first){
+        e.preventDefault();
+        last.focus();
+      } else if(!e.shiftKey && document.activeElement === last){
+        e.preventDefault();
+        first.focus();
+      }
     }
   });
 
@@ -4314,6 +4346,11 @@
               : `¡Han vuelto ${revived.length} de tus favoritas terminadas: ${revived.join(', ')}!`);
     } else if(showFeedback){
       showToast(`Sincronizado: ${ok}/${tvItems.length} series actualizadas`);
+    } else if(ok < tvItems.length){
+      // sync automática silenciosa (al abrir la app): no molestamos con un
+      // toast si todo fue bien, pero si algo falló de verdad sí conviene
+      // que el usuario se entere en vez de quedar en silencio total.
+      showToast(`Aviso: ${tvItems.length - ok} serie(s) no se pudieron sincronizar en segundo plano.`);
     }
   }
 
