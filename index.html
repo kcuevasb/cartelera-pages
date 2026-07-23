@@ -2706,8 +2706,11 @@
     if(!watched && idx !== -1) item.watched.splice(idx,1);
     if(watched){
       item.last_watched_at = Date.now();
-      if(!Array.isArray(item.diary)) item.diary = [];
-      item.diary.push({ date: todayISO(), label: `T${season_number}E${episode_number}`, note: '' });
+      // Antes se añadía una entrada de diario automática por CADA episodio
+      // marcado (ej. "T1E9", "T1E8"...) — con una temporada de 10 episodios
+      // el diario se llenaba de líneas sin nada que decir. Si el usuario
+      // quiere dejar constancia de algo, ya existe "+ Añadir entrada" para
+      // hacerlo a mano, con su propia nota.
     }
   }
   /**
@@ -4026,7 +4029,10 @@
 
     if(item.media_type === 'tv'){
       html += `<div id="seasonsWrap">`;
-      [...item.seasons].sort((a,b)=>a.season_number-b.season_number).forEach(s=>{
+      // Orden descendente (última temporada primero): es la más relevante
+      // para quien ya sigue la serie, así no hay que bajar hasta el final
+      // de la lista para llegar a lo más reciente.
+      [...item.seasons].sort((a,b)=>b.season_number-a.season_number).forEach(s=>{
         const watchedInSeason = item.watched.filter(c=>c.startsWith(`S${s.season_number}E`)).length;
         const seasonComplete = s.episode_count > 0 && watchedInSeason === s.episode_count;
         html += `
