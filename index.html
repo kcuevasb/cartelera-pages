@@ -1513,6 +1513,11 @@
   function todayISO(){ return new Date().toISOString().slice(0,10); }
 
   /** "en 3 días" / "mañana" / "hoy" / "hace 2 días", para acompañar una fecha. */
+  /** Año de inicio: first_air_date para series, release_date para películas. */
+  function startYear(item){
+    const dateStr = item.media_type === 'movie' ? item.release_date : item.first_air_date;
+    return dateStr ? dateStr.slice(0,4) : '';
+  }
   function relativeDays(dateStr){
     if(!dateStr) return '';
     try{
@@ -1683,6 +1688,7 @@
           tmdb_id: d.id, media_type:'tv',
           title: d.name, poster_path: d.poster_path,
           overview: d.overview,
+          first_air_date: d.first_air_date,
           genres: (d.genres||[]).map(g=>g.name),
           status: forcedStatus || 'watchlist',
           added_at: Date.now(),
@@ -3961,7 +3967,7 @@
       ${item.poster_path ? `<img src="${IMG_BASE}${item.poster_path}" alt="" data-lightbox="${item.poster_path}" style="cursor:zoom-in;">` : `<div class="poster-placeholder" style="width:96px;height:144px;border-radius:8px;background:#0c0e15;"></div>`}
       <div class="detail-hero-info">
         <div class="detail-title">${escapeHtml(item.title)}</div>
-        <div class="detail-meta">${(item.genres||[]).join(' · ') || '—'}</div>
+        <div class="detail-meta">${[startYear(item), ...(item.genres||[])].filter(Boolean).join(' · ') || '—'}</div>
         <div class="detail-overview">${escapeHtml(item.overview || 'Sin sinopsis disponible.')}</div>
         <div class="preview-extra hidden" id="detailExtraField"></div>
         <div class="keyword-row" id="detailKeywordRow"></div>
@@ -4317,6 +4323,10 @@
         const wasEnded = item.tmdb_status === 'Ended' || item.tmdb_status === 'Canceled';
         const d = await fetchTvDetails(item.tmdb_id, { bypassCache: true });
         item.tmdb_status = d.status;
+        // Backfill para series añadidas antes de que se empezara a guardar
+        // este campo — no hace falta ninguna migración, se autocompleta
+        // solo en la próxima sincronización.
+        if(!item.first_air_date) item.first_air_date = d.first_air_date;
         item.episode_run_time = (d.episode_run_time && d.episode_run_time[0]) || item.episode_run_time;
         item.seasons = (d.seasons||[]).filter(s=>STATE.includeSpecials || s.season_number>0).map(s=>({
           season_number: s.season_number, name: s.name, episode_count: s.episode_count, air_date: s.air_date
