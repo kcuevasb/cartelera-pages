@@ -654,6 +654,11 @@
 
     /* ---------- CONTINUAR VIENDO ---------- */
     .continue-section{margin-top:22px;}
+    /* Solo "Estás al día" (justo después del grid principal de "Viendo")
+       necesita este separador — las demás estanterías (Pendientes,
+       Películas...) ya van una detrás de otra sin ambigüedad de dónde
+       empieza cada una. */
+    #caughtUpShelf{margin-top:28px;padding-top:18px;border-top:1px solid var(--border);}
     .continue-label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
     .continue-row{display:flex;gap:16px;overflow-x:auto;padding-bottom:6px;}
     .continue-card{flex:0 0 110px;cursor:pointer;}
@@ -883,7 +888,7 @@
   </div>
 
   <div class="continue-section hidden" id="caughtUpShelf">
-    <div class="continue-label">Estás al día</div>
+    <div class="continue-label" title="Series que sigues y para las que no tienes ningún episodio nuevo pendiente ahora mismo">Estás al día</div>
     <div class="continue-row" id="caughtUpRow"></div>
   </div>
 
